@@ -150,25 +150,26 @@ typedef struct
     uint32_t    time_scale;                                 // u(32)
     bool        fixed_frame_rate_flag;                      // u(1)
     bool        nal_hrd_parameters_present_flag;            // u(1)
-    HRD_t nal_hrd_parameters;                               // hrd_paramters_t
-    bool      vcl_hrd_parameters_present_flag;              // u(1)
-    HRD_t vcl_hrd_parameters;                               // hrd_paramters_t
-    bool      low_delay_hrd_flag;                           // u(1)
-    bool      pic_struct_present_flag;                      // u(1)
-    bool      bitstream_restriction_flag;                   // u(1)
-    bool      motion_vectors_over_pic_boundaries_flag;      // u(1)
-    uint32_t max_bytes_per_pic_denom;                       // ue(v)
-    uint32_t max_bits_per_mb_denom;                         // ue(v)
-    uint32_t log2_max_mv_length_vertical;                   // ue(v)
-    uint32_t log2_max_mv_length_horizontal;                 // ue(v)
-    uint32_t num_reorder_frames;                            // ue(v)
-    uint32_t max_dec_frame_buffering;                       // ue(v)
+    HRD_t       nal_hrd_parameters;                         // hrd_paramters_t
+    bool        vcl_hrd_parameters_present_flag;            // u(1)
+    HRD_t       vcl_hrd_parameters;                         // hrd_paramters_t
+    bool        low_delay_hrd_flag;                         // u(1)
+    bool        pic_struct_present_flag;                    // u(1)
+    bool        bitstream_restriction_flag;                 // u(1)
+    bool        motion_vectors_over_pic_boundaries_flag;    // u(1)
+    uint32_t    max_bytes_per_pic_denom;                    // ue(v)
+    uint32_t    max_bits_per_mb_denom;                      // ue(v)
+    uint32_t    log2_max_mv_length_vertical;                // ue(v)
+    uint32_t    log2_max_mv_length_horizontal;              // ue(v)
+    uint32_t    num_reorder_frames;                         // ue(v)
+    uint32_t    max_dec_frame_buffering;                    // ue(v)
 } VUI_t;
 
 
 typedef struct 
 {
     uint8_t profile_idc;                                        // u(8)
+
     bool   constrained_set0_flag;                               // u(1)
     bool   constrained_set1_flag;                               // u(1)
     bool   constrained_set2_flag;                               // u(1)
@@ -180,12 +181,12 @@ typedef struct
     uint32_t seq_parameter_set_id;                              // ue(v)
     uint32_t chroma_format_idc;                                 // ue(v)
 
-    bool   seq_scaling_matrix_present_flag;                     // u(1)
-    bool   seq_scaling_list_present_flag[12];                   // u(1)
-    int32_t       ScalingList4x4[6][16];                        // se(v)
-    int32_t       ScalingList8x8[6][64];                        // se(v)
-    bool   UseDefaultScalingMatrix4x4Flag[6];
-    bool   UseDefaultScalingMatrix8x8Flag[6];
+    bool    seq_scaling_matrix_present_flag;                    // u(1)
+    bool    seq_scaling_list_present_flag[12];                  // u(1)
+    int32_t ScalingList4x4[6][16];                              // se(v)
+    int32_t ScalingList8x8[6][64];                              // se(v)
+    bool    UseDefaultScalingMatrix4x4Flag[6];
+    bool    UseDefaultScalingMatrix8x8Flag[6];
 
     uint32_t    bit_depth_luma_minus8;                          // ue(v)
     uint32_t    bit_depth_chroma_minus8;                        // ue(v)
@@ -221,11 +222,11 @@ typedef struct
 {
     uint32_t pic_parameter_set_id;                             // ue(v)
     uint32_t seq_parameter_set_id;                             // ue(v)
-    bool   entropy_coding_mode_flag;                            // u(1)
-    bool   transform_8x8_mode_flag;                             // u(1)
+    bool   entropy_coding_mode_flag;                           // u(1)
+    bool   transform_8x8_mode_flag;                            // u(1)
 
     bool   pic_scaling_matrix_present_flag;                     // u(1)
-    bool       pic_scaling_list_present_flag[12];                   // u(1)
+    bool   pic_scaling_list_present_flag[12];                   // u(1)
     int32_t       ScalingList4x4[6][16];                               // se(v)
     int32_t       ScalingList8x8[6][64];                               // se(v)
     bool   UseDefaultScalingMatrix4x4Flag[6];
