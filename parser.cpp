@@ -51,7 +51,7 @@ static void scaling_list
 }
 
 
-void ParseSPS(InputBitstream_t &bitstream, AvcInfo_t *pAvcInfo)
+void ParseSPS(InputBitstream_t &bitstream, SPS_t &sps, AvcInfo_t &pAvcInfo)
 {
     uint8_t profile_idc;
 
@@ -63,6 +63,7 @@ void ParseSPS(InputBitstream_t &bitstream, AvcInfo_t *pAvcInfo)
     uint8_t constraint_set5_flag;
 
     uint8_t level_idc;
+    uint8_t seq_parameter_set_id;
 
     uint32_t chroma_format_idc;
     bool separate_colour_plane_flag;
@@ -92,6 +93,7 @@ void ParseSPS(InputBitstream_t &bitstream, AvcInfo_t *pAvcInfo)
     READ_CODE(bitstream, 2, "reserved_zero_2bits");
 
     level_idc = READ_CODE(bitstream, 8, "level_idc");
+    seq_parameter_set_id = READ_UVLC(bitstream, "seq_parameter_set_id");
 
     if (profile_idc == 100 || profile_idc == 110 || profile_idc == 122 || profile_idc == 244
      || profile_idc == 44  || profile_idc == 83  || profile_idc == 86  || profile_idc == 118 
@@ -102,6 +104,7 @@ void ParseSPS(InputBitstream_t &bitstream, AvcInfo_t *pAvcInfo)
         if (chroma_format_idc == 3)
         {
             separate_colour_plane_flag = READ_FLAG(bitstream, "separate_colour_plane_flag");
+            sps.separate_colour_plane_flag = separate_colour_plane_flag;
         }
 
         bit_depth_luma_minus8 = READ_UVLC(bitstream, "bit_depth_luma_minus8");
@@ -129,6 +132,8 @@ void ParseSPS(InputBitstream_t &bitstream, AvcInfo_t *pAvcInfo)
     }
 
     log2_max_frame_num_minus4 = READ_UVLC(bitstream, "log2_max_frame_num_minus4");
+
+    sps.log2_max_frame_num_minus4 = log2_max_frame_num_minus4;
 }
 
 
@@ -137,6 +142,23 @@ void ParsePPS(InputBitstream_t &bitstream)
 }
 
 
-void ParseSliceHeader(InputBitstream_t &bitstream, NaluType nal_type, string &message)
+void ParseSliceHeader(InputBitstream_t &bitstream, SPS_t &sps, string &message)
 {
+    uint32_t first_mb_in_slice;
+    uint32_t slice_type;
+    uint32_t pic_parameter_set_id;
+    uint8_t colour_plane_id;
+    uint16_t frame_num;
+
+    first_mb_in_slice       = READ_UVLC(bitstream, "first_mb_in_slice");
+    slice_type              = READ_UVLC(bitstream, "slice_type");
+    pic_parameter_set_id    = READ_UVLC(bitstream, "pic_parameter_set_id");
+
+    if (sps.separate_colour_plane_flag)
+    {
+        colour_plane_id = READ_CODE(bitstream, 2, "colour_plane_id");
+    }
+
+    frame_num = READ_CODE(bitstream, (sps.log2_max_frame_num_minus4 + 4), "frame_num");
 }
+

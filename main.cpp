@@ -41,6 +41,12 @@ static uint8_t u8endCode[] = { 0xFC, 0xFD, 0xFE, 0xFF };
 
 static uint8_t u8EsBuffer[ES_BUFFER_SIZE + sizeof(u8endCode)];
 
+static AvcInfo_t tAvcInfo;
+
+static SPS_t sps;
+
+string message;
+
 /******************************
  * local function
  */
@@ -119,7 +125,63 @@ static bool scan_nal
     return ret;
 }
 
-
+static uint32_t EBSPtoRBSP
+(
+    uint8_t *streamBuffer,
+    uint32_t end_bytepos,
+    uint32_t begin_bytepos
+)
+{
+    uint32_t i;
+    uint32_t j;
+    uint32_t count;
+    
+    count = 0;
+    j = begin_bytepos;
+    
+    for (i = begin_bytepos; i < end_bytepos; i++)
+    {
+        // in NAL unit, 0x000000, 0x000001, 0x000002 shall not occur at any byte-aligned position
+        if (count == 2 && streamBuffer[i] < 0x03)
+        {
+            return -1;
+        }
+        
+        if (count == 2 && streamBuffer[i] == 0x03)
+        {
+            // check the 4th byte after 0x000003, except when cabac.....
+            if ((i < end_bytepos - 1) && (streamBuffer[i + 1] > 0x03))
+            {
+                return -1;
+            }
+            
+            if (i == end_bytepos - 1)
+            {
+                return j;
+            }
+            
+            // escape 0x03 byte!
+            i++;
+            count = 0;
+        }
+        
+        streamBuffer[j] = streamBuffer[i];
+        //printf("[%02u] 0x%02x\n", j, streamBuffer[j]);
+        
+        if (streamBuffer[i] == 0x00)
+        {
+            count++;
+        }
+        else
+        {
+            count = 0;
+        }
+        
+        j++;
+    }
+    
+    return j;
+}
 
 bool fill_es_buffer
 (
@@ -179,8 +241,6 @@ int main(int argc, char *argv[]) {
     bool        forbidden_zero_bit;
     uint8_t     nal_ref_idc;
     NaluType    nal_unit_type;
-    //uint8_t     nuh_layer_id;
-    //uint8_t     nuh_temporal_id_plus1;
     uint32_t    nal_len;
     uint32_t    offset = 0;
     uint32_t    prefix_len = 0;
@@ -245,26 +305,17 @@ int main(int argc, char *argv[]) {
         bitstream.m_held_bits       = 0;
         bitstream.m_numBitsRead     = 0;
 
-#if 0
         switch (nal_unit_type)
         {
-            case NAL_UNIT_VPS:
-            {             
-                EBSPtoRBSP(&u8EsBuffer[offset + prefix_len], nal_len, 0);
-                
-                ParseVPS(bitstream, &vps);
-                
-                break;
-            }
-            case NAL_UNIT_SPS:
+            case NALU_TYPE_SPS:
             {              
                 EBSPtoRBSP(&u8EsBuffer[offset + prefix_len], nal_len, 0);
                 
-                ParseSPS(bitstream, &tHevcInfo);
+                ParseSPS(bitstream, sps, tAvcInfo);
                 
                 break;
             }
-            case NAL_UNIT_PPS:
+            case NALU_TYPE_PPS:
             {
                 EBSPtoRBSP(&u8EsBuffer[offset + prefix_len], nal_len, 0);
                 
@@ -272,47 +323,27 @@ int main(int argc, char *argv[]) {
                 
                 break;
             }
-            case NAL_UNIT_ACCESS_UNIT_DELIMITER:
+            case NALU_TYPE_AUD:
             {
                 EBSPtoRBSP(&u8EsBuffer[offset + prefix_len], nal_len, 0);
 
-                ParseAUD(bitstream);
+                //ParseAUD(bitstream);
                 
                 break;
             }
-            case NAL_UNIT_CODED_SLICE_TRAIL_N:
-            case NAL_UNIT_CODED_SLICE_TRAIL_R:
-            case NAL_UNIT_CODED_SLICE_TSA_N:
-            case NAL_UNIT_CODED_SLICE_TSA_R:
-            case NAL_UNIT_CODED_SLICE_STSA_N:
-            case NAL_UNIT_CODED_SLICE_STSA_R:
-            case NAL_UNIT_CODED_SLICE_RADL_N:
-            case NAL_UNIT_CODED_SLICE_RADL_R:
-            case NAL_UNIT_CODED_SLICE_RASL_N:
-            case NAL_UNIT_CODED_SLICE_RASL_R:
-            case NAL_UNIT_CODED_SLICE_BLA_W_LP:    // 16
-            case NAL_UNIT_CODED_SLICE_BLA_W_RADL:  // 17
-            case NAL_UNIT_CODED_SLICE_BLA_N_LP:    // 18
-            case NAL_UNIT_CODED_SLICE_IDR_W_RADL:  // 19
-            case NAL_UNIT_CODED_SLICE_IDR_N_LP:    // 20
-            case NAL_UNIT_CODED_SLICE_CRA:         // 21
+            case NALU_TYPE_SLICE:
             {
                 EBSPtoRBSP(&u8EsBuffer[offset + prefix_len], nal_len, 0);
 
-                ParseSliceHeader(bitstream, nal_unit_type, message);
+                cout << "log2..." << sps.log2_max_frame_num_minus4 << endl;
+
+                ParseSliceHeader(bitstream, sps, message);
 
                 break;
             }
-            case NAL_UNIT_PREFIX_SEI:
+            case NALU_TYPE_SEI:
             {
                 EBSPtoRBSP(&u8EsBuffer[offset + prefix_len], nal_len, 0);
-
-                SeiType sei_payload_type = SEI_BUFFERING_PERIOD;
-                uint8_t sei_payload_size = 0;
-                PicStruct pic_struct = PIC_STRUCT_FRAME;
-
-        
-                ParseSEI(bitstream, &sei_payload_type, &sei_payload_size, &pic_struct);
                 
                 break;
             }
@@ -321,7 +352,6 @@ int main(int argc, char *argv[]) {
                 break;
             }
         }
-#endif
 
         offset = offset + nal_len;
         

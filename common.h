@@ -264,6 +264,11 @@ typedef struct
 
 typedef struct
 {
+    uint32_t first_mb_in_slice;
+    uint32_t slice_type;
+    uint32_t pic_parameter_set_id;
+    uint8_t colour_plane_id;
+    uint16_t frame_num;
 } Slice_t;
 
 
