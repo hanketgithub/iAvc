@@ -183,40 +183,9 @@ static uint32_t EBSPtoRBSP
     return j;
 }
 
-bool fill_es_buffer
-(
-    uint8_t *pu8NalAddr,
-    uint32_t u32NalSize,
-    int fd
-)
+
+int main(int argc, char *argv[])
 {
-    ssize_t rd_sz;
-    
-    memmove(u8EsBuffer, pu8NalAddr, u32NalSize);
-
-    rd_sz = read(fd, &u8EsBuffer[u32NalSize], ES_BUFFER_SIZE - u32NalSize);
-    if (rd_sz == 0) // EOF
-    {
-        return false;
-    }
-    else if (rd_sz < (ES_BUFFER_SIZE - u32NalSize))  // last read!  
-    {
-        printf("last read!\n");
-        
-        // Append Stop Code at the end of last read
-        memcpy(&u8EsBuffer[u32NalSize + rd_sz], u8endCode, sizeof(u8endCode));        
-    }
-    else
-    {
-        // Append Stop Code at the end of buffer
-        memcpy(&u8EsBuffer[ES_BUFFER_SIZE], u8endCode, sizeof(u8endCode));
-    }
-
-    return true;
-}
-
-
-int main(int argc, char *argv[]) {
     int fd;
     ssize_t rd_sz;
         
@@ -227,136 +196,158 @@ int main(int argc, char *argv[]) {
         return -1;
     }
 
-
     fd = open(argv[1], O_RDONLY);
     if (fd < 0)
     {
         perror(argv[1]);
         exit(-1);
     }
-    
-    uint8_t *ptr = u8EsBuffer;
-    uint8_t nal_unit_header[SIZE_OF_NAL_UNIT_HDR];
-    
+
+    struct stat st;
+    uint32_t file_size = 0;
+
+    if (stat(argv[1], &st) == 0)
+    {
+        file_size = st.st_size;
+    }
+    else
+    {
+        exit(-1);
+    }
+
+    uint8_t *buf = (uint8_t *) calloc(1, file_size + sizeof(u8EsBuffer));
+
+    rd_sz = read(fd, buf, file_size);
+
+    //printf("file_size=%x rd_size=%x\n", file_size, rd_sz);
+
+    uint8_t     nal_unit_header[SIZE_OF_NAL_UNIT_HDR];
     bool        forbidden_zero_bit;
     uint8_t     nal_ref_idc;
     NaluType    nal_unit_type;
-    uint32_t    nal_len;
-    uint32_t    offset = 0;
-    uint32_t    prefix_len = 0;
 
-    fill_es_buffer(u8EsBuffer, 0, fd);
+    uint8_t *ptr = buf;
 
-    while (1)
-    {        
-        if (!scan_nal
-             (
-                ptr,
-                nal_unit_header,
-                &nal_len,
-                &prefix_len
-             )
-           )
+    while (ptr - buf < file_size)
+    {
+        bool     nalFound = false;
+        uint32_t prefix_len = 0;
+
+        if (has_start_code(ptr, 2))
         {
-            // fill buffer
-            printf("fill buffer!\n");
-            
-            if (!fill_es_buffer(ptr, nal_len, fd))
+            prefix_len = 3;
+
+            // 0x00 0x00 0x01 0x47 is TS header
+            if (ptr[prefix_len] == 0x47)
             {
-                printf("No more data to read!\n");
-                break;
+                ptr += prefix_len;
+                continue;
             }
 
-            // rewind ptr
-            ptr = u8EsBuffer;
-            offset = 0;
+            nal_unit_header[0] = ptr[prefix_len];
+            nalFound = true;
+        }
+        else if (has_start_code(ptr, 3))
+        {
+            prefix_len = 4;
 
-            // try scan NAL again!
-            bool rescan = scan_nal
-             (
-                ptr,
-                nal_unit_header,
-                &nal_len,
-                &prefix_len
-             );
+            // 0x00 0x00 0x00 0x01 0x47 is TS header
+            if (ptr[prefix_len] == 0x47)
+            {
+                ptr += prefix_len;
+                continue;
+            }
 
-            printf("Try rescan NAL=%s\n", rescan ? "T" : "F");
+            nal_unit_header[0] = ptr[prefix_len];
+            nalFound = true;
         }
 
-        printf("offset=%ld\n", ptr - u8EsBuffer);
-
-        nal_unit_type           = (NaluType) ((nal_unit_header[0] & (BIT4 | BIT3 | BIT2 | BIT1 | BIT0)));
-        nal_ref_idc             = (nal_unit_header[0] & (BIT5 | BIT6) >> 5);
-        forbidden_zero_bit      = (nal_unit_header[0] & BIT7) >> 7;
-
-        printf("forbidden_zero_bit=%d, nal_unit_type=%02u, nal_ref_idc=%u, nal_len=%6u, offset=0x%x\n",
-               forbidden_zero_bit,
-               nal_unit_type,
-               nal_ref_idc,
-               nal_len,
-               offset);
-        
-        InputBitstream_t bitstream;
-
-        bitstream.m_fifo            = &u8EsBuffer[offset + prefix_len + SIZE_OF_NAL_UNIT_HDR];
-        bitstream.m_fifo_size       = nal_len - prefix_len - SIZE_OF_NAL_UNIT_HDR;
-        bitstream.m_fifo_idx        = 0;
-        bitstream.m_num_held_bits   = 0;
-        bitstream.m_held_bits       = 0;
-        bitstream.m_numBitsRead     = 0;
-
-        switch (nal_unit_type)
+        if (nalFound)
         {
-            case NALU_TYPE_SPS:
-            {              
-                EBSPtoRBSP(&u8EsBuffer[offset + prefix_len], nal_len, 0);
-                
-                ParseSPS(bitstream, sps, tAvcInfo);
-                
-                break;
-            }
-            case NALU_TYPE_PPS:
-            {
-                EBSPtoRBSP(&u8EsBuffer[offset + prefix_len], nal_len, 0);
-                
-                ParsePPS(bitstream);
-                
-                break;
-            }
-            case NALU_TYPE_AUD:
-            {
-                EBSPtoRBSP(&u8EsBuffer[offset + prefix_len], nal_len, 0);
+            nal_unit_type           = (NaluType) ((nal_unit_header[0] & (BIT4 | BIT3 | BIT2 | BIT1 | BIT0)));
+            nal_ref_idc             = (nal_unit_header[0] & (BIT5 | BIT6) >> 5);
+            forbidden_zero_bit      = (nal_unit_header[0] & BIT7) >> 7;
 
-                //ParseAUD(bitstream);
-                
-                break;
-            }
-            case NALU_TYPE_SLICE:
+            if (!forbidden_zero_bit)
             {
-                EBSPtoRBSP(&u8EsBuffer[offset + prefix_len], nal_len, 0);
+                printf("nal=0x%02x forbidden_zero_bit=%d, nal_unit_type=%02u, nal_ref_idc=%u, offset=0x%x\n",
+                       nal_unit_header[0],
+                       forbidden_zero_bit,
+                       nal_unit_type,
+                       nal_ref_idc,
+                       (uint32_t) (ptr - buf));
 
-                cout << "log2..." << sps.log2_max_frame_num_minus4 << endl;
+                memcpy(u8EsBuffer, ptr, sizeof(u8EsBuffer));
 
-                ParseSliceHeader(bitstream, sps, message);
+                InputBitstream_t bitstream;
 
-                break;
-            }
-            case NALU_TYPE_SEI:
-            {
-                EBSPtoRBSP(&u8EsBuffer[offset + prefix_len], nal_len, 0);
-                
-                break;
-            }
-            default:
-            {
-                break;
+                bitstream.m_fifo            = &u8EsBuffer[prefix_len + SIZE_OF_NAL_UNIT_HDR];
+                bitstream.m_fifo_size       = sizeof(u8EsBuffer);
+                bitstream.m_fifo_idx        = 0;
+                bitstream.m_num_held_bits   = 0;
+                bitstream.m_held_bits       = 0;
+                bitstream.m_numBitsRead     = 0;
+
+                switch (nal_unit_type)
+                {
+                    case NALU_TYPE_SPS:
+                    {              
+                        EBSPtoRBSP(&u8EsBuffer[prefix_len + SIZE_OF_NAL_UNIT_HDR], sizeof(u8EsBuffer), 0);
+                        
+                        ParseSPS(bitstream, sps, tAvcInfo);
+                        
+                        break;
+                    }
+                    case NALU_TYPE_PPS:
+                    {
+                        EBSPtoRBSP(&u8EsBuffer[prefix_len + SIZE_OF_NAL_UNIT_HDR], sizeof(u8EsBuffer), 0);
+                        
+                        ParsePPS(bitstream);
+                        
+                        break;
+                    }
+                    case NALU_TYPE_AUD:
+                    {
+                        EBSPtoRBSP(&u8EsBuffer[prefix_len + SIZE_OF_NAL_UNIT_HDR], sizeof(u8EsBuffer), 0);
+
+                        //ParseAUD(bitstream);
+                        
+                        break;
+                    }
+                    case NALU_TYPE_SLICE:
+                    {
+                        EBSPtoRBSP(&u8EsBuffer[prefix_len + SIZE_OF_NAL_UNIT_HDR], sizeof(u8EsBuffer), 0);
+
+                        //cout << "log2_max_frame_num_minus4=" << sps.log2_max_frame_num_minus4 << endl;
+
+                        ParseSliceHeader(bitstream, sps, message);
+
+                        break;
+                    }
+                    case NALU_TYPE_SEI:
+                    {
+                        EBSPtoRBSP(&u8EsBuffer[prefix_len + SIZE_OF_NAL_UNIT_HDR], sizeof(u8EsBuffer), 0);
+                        
+                        break;
+                    }
+                    default:
+                    {
+                        break;
+                    }
+                }
             }
         }
 
-        offset = offset + nal_len;
-        
-        ptr += nal_len;        
+        if (prefix_len)
+        {
+            ptr += prefix_len;
+        }
+        else
+        {
+            ptr++;
+        }
     }
 
     return 0;
 }
+
