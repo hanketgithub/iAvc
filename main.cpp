@@ -192,7 +192,6 @@ int main(int argc, char *argv[])
     if (argc < 2)
     {
         printf("useage: %s [input_file]\n", argv[0]);
-        
         return -1;
     }
 
@@ -212,23 +211,22 @@ int main(int argc, char *argv[])
     }
     else
     {
+        perror(argv[1]);
         exit(-1);
     }
 
-    uint8_t *buf = (uint8_t *) calloc(1, file_size + sizeof(u8EsBuffer));
+    uint8_t *data = (uint8_t *) calloc(1, file_size + sizeof(u8EsBuffer));
 
-    rd_sz = read(fd, buf, file_size);
-
-    //printf("file_size=%x rd_size=%x\n", file_size, rd_sz);
+    rd_sz = read(fd, data, file_size);
 
     uint8_t     nal_unit_header[SIZE_OF_NAL_UNIT_HDR];
     bool        forbidden_zero_bit;
     uint8_t     nal_ref_idc;
     NaluType    nal_unit_type;
 
-    uint8_t *ptr = buf;
+    uint8_t *ptr = data;
 
-    while (ptr - buf < file_size)
+    while (ptr - data < file_size)
     {
         bool     nalFound = false;
         uint32_t prefix_len = 0;
@@ -275,14 +273,14 @@ int main(int argc, char *argv[])
                        forbidden_zero_bit,
                        nal_unit_type,
                        nal_ref_idc,
-                       (uint32_t) (ptr - buf));
+                       (uint32_t) (ptr - data));
 
                 memcpy(u8EsBuffer, ptr, sizeof(u8EsBuffer));
 
                 InputBitstream_t bitstream;
 
                 bitstream.m_fifo            = &u8EsBuffer[prefix_len + SIZE_OF_NAL_UNIT_HDR];
-                bitstream.m_fifo_size       = sizeof(u8EsBuffer);
+                bitstream.m_fifo_size       = sizeof(u8EsBuffer) - (prefix_len + SIZE_OF_NAL_UNIT_HDR);
                 bitstream.m_fifo_idx        = 0;
                 bitstream.m_num_held_bits   = 0;
                 bitstream.m_held_bits       = 0;
@@ -291,43 +289,31 @@ int main(int argc, char *argv[])
                 switch (nal_unit_type)
                 {
                     case NALU_TYPE_SPS:
-                    {              
-                        EBSPtoRBSP(&u8EsBuffer[prefix_len + SIZE_OF_NAL_UNIT_HDR], sizeof(u8EsBuffer), 0);
-                        
+                    {
                         ParseSPS(bitstream, sps, tAvcInfo);
-                        
+
                         break;
                     }
                     case NALU_TYPE_PPS:
                     {
-                        EBSPtoRBSP(&u8EsBuffer[prefix_len + SIZE_OF_NAL_UNIT_HDR], sizeof(u8EsBuffer), 0);
-                        
                         ParsePPS(bitstream);
-                        
+
                         break;
                     }
                     case NALU_TYPE_AUD:
                     {
-                        EBSPtoRBSP(&u8EsBuffer[prefix_len + SIZE_OF_NAL_UNIT_HDR], sizeof(u8EsBuffer), 0);
-
                         //ParseAUD(bitstream);
-                        
+
                         break;
                     }
                     case NALU_TYPE_SLICE:
                     {
-                        EBSPtoRBSP(&u8EsBuffer[prefix_len + SIZE_OF_NAL_UNIT_HDR], sizeof(u8EsBuffer), 0);
-
-                        //cout << "log2_max_frame_num_minus4=" << sps.log2_max_frame_num_minus4 << endl;
-
                         ParseSliceHeader(bitstream, sps, message);
 
                         break;
                     }
                     case NALU_TYPE_SEI:
                     {
-                        EBSPtoRBSP(&u8EsBuffer[prefix_len + SIZE_OF_NAL_UNIT_HDR], sizeof(u8EsBuffer), 0);
-                        
                         break;
                     }
                     default:
