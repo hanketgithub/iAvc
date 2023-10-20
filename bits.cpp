@@ -112,7 +112,7 @@ static uint32_t read_bits(InputBitstream_t &bitstream, uint32_t uiNumberOfBits)
     //assert(uiNumberOfBits <= 32);
     
     bitstream.m_numBitsRead += uiNumberOfBits;
-    
+
     /* NB, bits are extracted from the MSB of each byte. */
     uint32_t retval = 0;
     
@@ -167,7 +167,9 @@ static uint32_t read_bits(InputBitstream_t &bitstream, uint32_t uiNumberOfBits)
     /* store held bits */
     bitstream.m_num_held_bits = next_num_held_bits;
     bitstream.m_held_bits = (uint8_t) (aligned_word & 0xFF);
-    
+
+    //printf("m_num_held_bits=%d\n", next_num_held_bits);
+
     return retval;
 }
 

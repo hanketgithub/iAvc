@@ -45,6 +45,8 @@ static AvcInfo_t tAvcInfo;
 
 static SPS_t sps;
 
+static PPS_t pps;
+
 string message;
 
 /******************************
@@ -296,7 +298,7 @@ int main(int argc, char *argv[])
                     }
                     case NALU_TYPE_PPS:
                     {
-                        ParsePPS(bitstream);
+                        ParsePPS(bitstream, pps);
 
                         break;
                     }
@@ -308,7 +310,7 @@ int main(int argc, char *argv[])
                     }
                     case NALU_TYPE_SLICE:
                     {
-                        ParseSliceHeader(bitstream, sps, message);
+                        ParseSliceHeader(bitstream, sps, pps, false, message);
 
                         break;
                     }

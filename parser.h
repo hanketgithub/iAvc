@@ -6,9 +6,9 @@
 
 extern void ParseSPS(InputBitstream_t &bitstream, SPS_t &sps, AvcInfo_t &pAvcInfo);
 
-extern void ParsePPS(InputBitstream_t &bitstream);
+extern void ParsePPS(InputBitstream_t &bitstream, PPS_t &pps);
 
-extern void ParseSliceHeader(InputBitstream_t &bitstream, SPS_t &sps, std::string &message);
+extern void ParseSliceHeader(InputBitstream_t &bitstream, SPS_t &sps, PPS_t &pps, bool IdrPicFlag, std::string &message);
 
 
 #endif
