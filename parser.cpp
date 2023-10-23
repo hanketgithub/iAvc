@@ -51,6 +51,204 @@ static void scaling_list
 }
 
 
+// E.1.2 HRD parameters syntax
+static void hrd_parameters
+(
+    InputBitstream_t &bitstream,
+    HRD_t &hrd
+)
+{
+    uint32_t cpb_cnt_minus1;
+    uint32_t bit_rate_scale;
+    uint32_t cpb_size_scale;
+    uint32_t initial_cpb_removal_delay_length_minus1;
+    uint32_t cpb_removal_delay_length_minus1;
+    uint32_t dpb_output_delay_length_minus1;
+    uint32_t time_offset_length;
+
+    cpb_cnt_minus1 = READ_UVLC(bitstream, "cpb_cnt_minus1");
+    bit_rate_scale = READ_CODE(bitstream, 4, "bit_rate_scale");
+    cpb_size_scale = READ_CODE(bitstream, 4, "cpb_size_scale");
+    for (int SchedSelIdx = 0; SchedSelIdx <= cpb_cnt_minus1; SchedSelIdx++)
+    {
+        hrd.bit_rate_value_minus1[SchedSelIdx] = READ_UVLC(bitstream, "bit_rate_value_minus1");
+        hrd.cpb_size_value_minus1[SchedSelIdx] = READ_UVLC(bitstream, "cpb_size_value_minus1");
+        hrd.cbr_flag[SchedSelIdx] = READ_FLAG(bitstream, "cbr_flag");
+    }
+    initial_cpb_removal_delay_length_minus1 = READ_CODE(bitstream, 5, "initial_cpb_removal_delay_length_minus1");
+    cpb_removal_delay_length_minus1 = READ_CODE(bitstream, 5, "cpb_removal_delay_length_minus1");
+    dpb_output_delay_length_minus1 = READ_CODE(bitstream , 5, "dpb_output_delay_length_minus1");
+    time_offset_length = READ_CODE(bitstream, 5, "time_offset_length");
+
+    hrd.cpb_cnt_minus1 = cpb_cnt_minus1;
+    hrd.bit_rate_scale = bit_rate_scale;
+    hrd.cpb_size_scale = cpb_size_scale;
+    hrd.initial_cpb_removal_delay_length_minus1 = initial_cpb_removal_delay_length_minus1;
+    hrd.cpb_removal_delay_length_minus1 = cpb_removal_delay_length_minus1;
+    hrd.dpb_output_delay_length_minus1 = dpb_output_delay_length_minus1;
+    hrd.time_offset_length = time_offset_length;
+}
+
+
+// E.1.1 VUI parameters syntax
+static void vui_parameters
+(
+    InputBitstream_t &bitstream,
+    VUI_t &vui
+)
+{
+    bool        aspect_ratio_info_present_flag          = false;    // u(1)
+    uint8_t     aspect_ratio_idc                        = 0;        // u(8)
+    uint16_t    sar_width                               = 0;        // u(16)
+    uint16_t    sar_height                              = 0;        // u(16)
+    bool        overscan_info_present_flag              = false;    // u(1)
+    bool        overscan_appropriate_flag               = false;    // u(1)
+    bool        video_signal_type_present_flag          = false;    // u(1)
+    uint8_t     video_format                            = 0;        // u(3)
+    bool        video_full_range_flag                   = false;    // u(1)
+    bool        colour_description_present_flag         = false;    // u(1)
+    uint8_t     colour_primaries                        = 0;        // u(8)
+    uint8_t     transfer_characteristics                = 0;        // u(8)
+    uint8_t     matrix_coefficients                     = 0;        // u(8)
+    bool        chroma_location_info_present_flag       = false;    // u(1)
+    uint32_t    chroma_sample_loc_type_top_field        = 0;        // ue(v)
+    uint32_t    chroma_sample_loc_type_bottom_field     = 0;        // ue(v)
+    bool        timing_info_present_flag                = false;    // u(1)
+    uint32_t    num_units_in_tick                       = 0;        // u(32)
+    uint32_t    time_scale                              = 0;        // u(32)
+    bool        fixed_frame_rate_flag                   = false;    // u(1)
+    bool        nal_hrd_parameters_present_flag         = false;    // u(1)
+    bool        vcl_hrd_parameters_present_flag         = false;    // u(1)
+    bool        low_delay_hrd_flag                      = false;    // u(1)
+    bool        pic_struct_present_flag                 = false;    // u(1)
+    bool        bitstream_restriction_flag              = false;    // u(1)
+    bool        motion_vectors_over_pic_boundaries_flag = false;    // u(1)
+    uint32_t    max_bytes_per_pic_denom                 = 0;        // ue(v)
+    uint32_t    max_bits_per_mb_denom                   = 0;        // ue(v)
+    uint32_t    log2_max_mv_length_vertical             = 0;        // ue(v)
+    uint32_t    log2_max_mv_length_horizontal           = 0;        // ue(v)
+    uint32_t    max_num_reorder_frames                  = 0;        // ue(v)
+    uint32_t    max_dec_frame_buffering                 = 0;        // ue(v)
+
+
+    aspect_ratio_info_present_flag = READ_FLAG(bitstream, "aspect_ratio_info_present_flag");
+    if (aspect_ratio_info_present_flag)
+    {
+        aspect_ratio_idc = READ_CODE(bitstream, 8, "aspect_ratio_idc");
+        if (aspect_ratio_idc == ASPECT_RATIO_EXTENDED_SAR)
+        {
+            sar_width = READ_CODE(bitstream, 16, "sar_width");
+            sar_height = READ_CODE(bitstream , 16, "sar_height");
+        }
+    }
+
+    overscan_info_present_flag = READ_FLAG(bitstream, "overscan_info_present_flag");
+    if (overscan_info_present_flag)
+    {
+        overscan_appropriate_flag = READ_FLAG(bitstream, "overscan_appropriate_flag");
+    }
+
+    video_signal_type_present_flag = READ_FLAG(bitstream, "video_signal_type_present_flag");
+    if (video_signal_type_present_flag)
+    {
+        video_format = READ_CODE(bitstream, 3, "video_format");
+        video_full_range_flag = READ_FLAG(bitstream, "video_full_range_flag");
+        colour_description_present_flag = READ_FLAG(bitstream, "colour_description_present_flag");
+        if (colour_description_present_flag)
+        {
+            colour_primaries = READ_CODE(bitstream, 8, "colour_primaries");
+            transfer_characteristics = READ_CODE(bitstream, 8, "transfer_characteristics");
+            matrix_coefficients = READ_CODE(bitstream, 8, "matrix_coefficients");
+        }
+    }
+
+    chroma_location_info_present_flag = READ_FLAG(bitstream, "chroma_location_info_present_flag");
+    if (chroma_location_info_present_flag)
+    {
+        chroma_sample_loc_type_top_field = READ_UVLC(bitstream, "chroma_sample_loc_type_top_field");
+        chroma_sample_loc_type_bottom_field = READ_UVLC(bitstream, "chroma_sample_loc_type_bottom_field");
+    }
+
+    timing_info_present_flag = READ_FLAG(bitstream, "timing_info_present_flag");
+    if (timing_info_present_flag)
+    {
+        num_units_in_tick = READ_CODE(bitstream, 32, "num_units_in_tick");
+        time_scale = READ_CODE(bitstream, 32, "time_scale");
+        fixed_frame_rate_flag = READ_FLAG(bitstream, "fixed_frame_rate_flag");
+    }
+
+    nal_hrd_parameters_present_flag = READ_FLAG(bitstream, "nal_hrd_parameters_present_flag");
+    if (nal_hrd_parameters_present_flag)
+    {
+        hrd_parameters(bitstream, vui.nal_hrd_parameters);
+    }
+
+    vcl_hrd_parameters_present_flag = READ_FLAG(bitstream, "vcl_hrd_parameters_present_flag");
+    if (vcl_hrd_parameters_present_flag)
+    {
+        hrd_parameters(bitstream, vui.vcl_hrd_parameters);
+    }
+
+    if (nal_hrd_parameters_present_flag || vcl_hrd_parameters_present_flag)
+    {
+        low_delay_hrd_flag = READ_FLAG(bitstream, "low_delay_hrd_flag");
+    }
+
+    pic_struct_present_flag = READ_FLAG(bitstream, "pic_struct_present_flag");
+    bitstream_restriction_flag = READ_FLAG(bitstream, "bitstream_restriction_flag");
+
+    if (bitstream_restriction_flag)
+    {
+        motion_vectors_over_pic_boundaries_flag = READ_FLAG(bitstream, "motion_vectors_over_pic_boundaries_flag");
+        max_bytes_per_pic_denom                 = READ_UVLC(bitstream, "max_bytes_per_pic_denom");
+        max_bits_per_mb_denom                   = READ_UVLC(bitstream, "max_bits_per_mb_denom");
+        log2_max_mv_length_horizontal           = READ_UVLC(bitstream, "log2_max_mv_length_horizontal");
+        log2_max_mv_length_vertical             = READ_UVLC(bitstream, "log2_max_mv_length_vertical");
+        max_num_reorder_frames                  = READ_UVLC(bitstream, "max_num_reorder_frames");
+        max_dec_frame_buffering                 = READ_UVLC(bitstream, "max_dec_frame_buffering");
+    }
+    
+
+    vui.aspect_ratio_info_present_flag  = aspect_ratio_info_present_flag;
+    vui.aspect_ratio_idc                = aspect_ratio_idc;
+    vui.sar_width                       = sar_width;
+    vui.sar_height                      = sar_height;
+
+    vui.overscan_info_present_flag  = overscan_info_present_flag;
+    vui.overscan_appropriate_flag   = overscan_appropriate_flag;
+
+    vui.video_signal_type_present_flag  = video_signal_type_present_flag;
+    vui.video_format                    = video_format;
+    vui.video_full_range_flag           = video_full_range_flag;
+    vui.colour_description_present_flag = colour_description_present_flag;
+    vui.colour_primaries                = colour_primaries;
+    vui.transfer_characteristics        = transfer_characteristics;
+    vui.matrix_coefficients             = matrix_coefficients;
+
+    vui.chroma_location_info_present_flag   = chroma_location_info_present_flag;
+    vui.chroma_sample_loc_type_top_field    = chroma_sample_loc_type_top_field;
+    vui.chroma_sample_loc_type_bottom_field = chroma_sample_loc_type_bottom_field;
+
+    vui.timing_info_present_flag = timing_info_present_flag;
+    vui.num_units_in_tick = num_units_in_tick;
+    vui.time_scale = time_scale;
+    vui.fixed_frame_rate_flag = fixed_frame_rate_flag;
+
+    vui.nal_hrd_parameters_present_flag = nal_hrd_parameters_present_flag;
+    vui.vcl_hrd_parameters_present_flag = vcl_hrd_parameters_present_flag;
+
+    vui.bitstream_restriction_flag = bitstream_restriction_flag;
+    vui.motion_vectors_over_pic_boundaries_flag = motion_vectors_over_pic_boundaries_flag;
+    vui.max_bytes_per_pic_denom = max_bytes_per_pic_denom;
+    vui.max_bits_per_mb_denom = max_bits_per_mb_denom;
+    vui.log2_max_mv_length_horizontal = log2_max_mv_length_horizontal;
+    vui.log2_max_mv_length_vertical = log2_max_mv_length_vertical;
+    vui.max_num_reorder_frames = max_num_reorder_frames;
+    vui.max_dec_frame_buffering = max_dec_frame_buffering;
+}
+
+
+// 7.3.2.1.1 Sequence parameter set data syntax
 void ParseSPS(InputBitstream_t &bitstream, SPS_t &sps, AvcInfo_t &pAvcInfo)
 {
     uint8_t profile_idc;
@@ -66,7 +264,7 @@ void ParseSPS(InputBitstream_t &bitstream, SPS_t &sps, AvcInfo_t &pAvcInfo)
     uint8_t seq_parameter_set_id;
 
     uint32_t chroma_format_idc;
-    bool separate_colour_plane_flag;
+    bool separate_colour_plane_flag = false;
     
     uint32_t bit_depth_luma_minus8;
     uint32_t bit_depth_chroma_minus8;
@@ -140,11 +338,19 @@ void ParseSPS(InputBitstream_t &bitstream, SPS_t &sps, AvcInfo_t &pAvcInfo)
                 {
                     if (i < 6)
                     {
-                        scaling_list(bitstream, ScalingList4x4[ i ], 16, UseDefaultScalingMatrix4x4Flag[ i ] );
+                        scaling_list(bitstream, ScalingList4x4[ i ], 16, sps.UseDefaultScalingMatrix4x4Flag[ i ] );
+                        for (int j = 0; i < ScalingList4x4[ i ].size(); j++)
+                        {
+                            sps.ScalingList4x4[i][j] = ScalingList4x4[ i ][ j ];
+                        }
                     }
                     else
                     {
-                        scaling_list(bitstream, ScalingList8x8[ i - 6 ], 64, UseDefaultScalingMatrix8x8Flag[ i - 6 ] );
+                        scaling_list(bitstream, ScalingList8x8[ i - 6 ], 64, sps.UseDefaultScalingMatrix8x8Flag[ i - 6 ] );
+                        for (int j = 0; j < ScalingList8x8[ i - 6 ].size(); j++)
+                        {
+                            sps.ScalingList8x8[i-6][j] = ScalingList8x8[ i - 6 ][ j ];
+                        }
                     }
                 }
             }
@@ -193,6 +399,7 @@ void ParseSPS(InputBitstream_t &bitstream, SPS_t &sps, AvcInfo_t &pAvcInfo)
     vui_parameters_present_flag = READ_FLAG(bitstream, "vui_parameters_present_flag");
     if (vui_parameters_present_flag)
     {
+        vui_parameters(bitstream, sps.vui_seq_parameters);
     }
 
 

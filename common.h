@@ -22,6 +22,8 @@
 //#define MAX_NUM_REF_PICS    16
 #define MAXnum_ref_frames_in_pic_order_cnt_cycle    256
 #define MAXnum_slice_groups_minus1                  8
+#define MAXIMUMVALUEOFcpb_cnt                       32
+
 
 typedef enum
 {
@@ -123,6 +125,16 @@ typedef struct
 
 typedef struct
 {
+  uint32_t cpb_cnt_minus1;                                  // ue(v)
+  uint32_t bit_rate_scale;                                  // u(4)
+  uint32_t cpb_size_scale;                                  // u(4)
+  uint32_t bit_rate_value_minus1 [MAXIMUMVALUEOFcpb_cnt];   // ue(v)
+  uint32_t cpb_size_value_minus1 [MAXIMUMVALUEOFcpb_cnt];   // ue(v)
+  uint32_t cbr_flag              [MAXIMUMVALUEOFcpb_cnt];   // u(1)
+  uint32_t initial_cpb_removal_delay_length_minus1;         // u(5)
+  uint32_t cpb_removal_delay_length_minus1;                 // u(5)
+  uint32_t dpb_output_delay_length_minus1;                  // u(5)
+  uint32_t time_offset_length;                              // u(5)
 } HRD_t;
 
 
@@ -160,7 +172,7 @@ typedef struct
     uint32_t    max_bits_per_mb_denom;                      // ue(v)
     uint32_t    log2_max_mv_length_vertical;                // ue(v)
     uint32_t    log2_max_mv_length_horizontal;              // ue(v)
-    uint32_t    num_reorder_frames;                         // ue(v)
+    uint32_t    max_num_reorder_frames;                     // ue(v)
     uint32_t    max_dec_frame_buffering;                    // ue(v)
 } VUI_t;
 
