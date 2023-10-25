@@ -52,6 +52,12 @@ static uint32_t pseudo_read
     uint32_t uiNumberOfBits
 );
 
+static void write_uvlc
+(
+    OutputBitstream_t &bitstream,
+    uint32_t uiCode 
+);
+
 static void write_bits
 (
     OutputBitstream_t &bitstream,
@@ -320,6 +326,27 @@ bool MORE_RBSP_DATA(InputBitstream_t &bitstream)
     return (cnt > 0);
 }
 
+
+static void write_uvlc
+(
+    OutputBitstream_t &bitstream,
+    uint32_t uiCode 
+)
+{
+    uint32_t uiLength = 1;
+    uint32_t uiTemp = ++uiCode;
+
+    while (1 != uiTemp)
+    {
+        uiTemp >>= 1;
+        uiLength += 2;
+    }
+
+    write_bits(bitstream, 0, uiLength >> 1);
+    write_bits(bitstream, uiCode, (uiLength+1) >> 1);
+}
+
+
 /**
  * TComOutputBitstream::write() in HM
  *
@@ -399,34 +426,30 @@ void WRITE_FLAG
 void WRITE_UVLC
 (
     OutputBitstream_t &bitstream,
-    uint32_t uiCode
+    uint32_t uiCode,
+    const char *name   
 )
 {
-    uint32_t uiLength = 1;
-    uint32_t uiTemp = ++uiCode;
+    write_uvlc(bitstream, uiCode);
 
-    while (1 != uiTemp)
-    {
-        uiTemp >>= 1;
-        uiLength += 2;
-    }
-
-    write_bits(bitstream, 0, uiLength >> 1);
-    write_bits(bitstream, uiCode, (uiLength+1) >> 1);
+    TRACE("%-50s ue(v)  : %d\n", name, uiCode);
 }
 
 
 void WRITE_SVLC
 (
     OutputBitstream_t &bitstream,
-    int32_t iCode
+    int32_t iCode,
+    const char *name   
 )
 {
     uint32_t uiCode;
 
     uiCode = ConvertToUInt(iCode);
 
-    WRITE_UVLC(bitstream, uiCode);
+    write_uvlc(bitstream, uiCode);
+
+    TRACE("%-50s se(v)  : %d\n", name, iCode);
 }
 
 

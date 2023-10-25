@@ -49,6 +49,7 @@ static PPS_t pps;
 
 string message;
 
+
 /******************************
  * local function
  */
@@ -279,40 +280,60 @@ int main(int argc, char *argv[])
 
                 memcpy(u8EsBuffer, ptr, sizeof(u8EsBuffer));
 
-                InputBitstream_t bitstream;
+                InputBitstream_t ibs;
 
-                bitstream.m_fifo            = &u8EsBuffer[prefix_len + SIZE_OF_NAL_UNIT_HDR];
-                bitstream.m_fifo_size       = sizeof(u8EsBuffer) - (prefix_len + SIZE_OF_NAL_UNIT_HDR);
-                bitstream.m_fifo_idx        = 0;
-                bitstream.m_num_held_bits   = 0;
-                bitstream.m_held_bits       = 0;
-                bitstream.m_numBitsRead     = 0;
+                ibs.m_fifo          = &u8EsBuffer[prefix_len + SIZE_OF_NAL_UNIT_HDR];
+                ibs.m_fifo_size     = sizeof(u8EsBuffer) - (prefix_len + SIZE_OF_NAL_UNIT_HDR);
+                ibs.m_fifo_idx      = 0;
+                ibs.m_num_held_bits = 0;
+                ibs.m_held_bits     = 0;
+                ibs.m_numBitsRead   = 0;
 
-                EBSPtoRBSP(bitstream.m_fifo, bitstream.m_fifo_size, 0);
+                EBSPtoRBSP(ibs.m_fifo, ibs.m_fifo_size, 0);
 
                 switch (nal_unit_type)
                 {
                     case NALU_TYPE_SPS:
                     {
-                        ParseSPS(bitstream, sps, tAvcInfo);
+                        ParseSPS(ibs, sps, tAvcInfo);
 
+                        // Simple test
+                        {
+                            OutputBitstream_t obs;
+
+                            obs.m_num_held_bits = 0;
+                            obs.m_held_bits     = 0;
+                            obs.m_fifo_idx      = 0;
+
+                            printf("obs size=%d\n", obs.m_fifo.size());
+
+                            GenerateSPS(obs, sps);
+
+                            printf("\n\n--");
+                            for (int i = 0; i < obs.m_fifo.size(); i++)
+                            {
+                                printf("0x%02x ", obs.m_fifo[i]);
+                            }
+                            printf("--\n\n");
+                        }
+                        exit(0);
                         break;
                     }
                     case NALU_TYPE_PPS:
                     {
-                        ParsePPS(bitstream, pps);
+                        ParsePPS(ibs, pps);
 
                         break;
                     }
                     case NALU_TYPE_AUD:
                     {
-                        //ParseAUD(bitstream);
+                        //ParseAUD(ibs);
 
                         break;
                     }
                     case NALU_TYPE_SLICE:
                     {
-                        ParseSliceHeader(bitstream, sps, pps, false, message);
+                        ParseSliceHeader(ibs, sps, pps, false, message);
 
                         break;
                     }

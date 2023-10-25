@@ -30,7 +30,6 @@ typedef struct
 
     std::vector<uint8_t> m_fifo;
     uint32_t m_fifo_idx;
-    uint32_t m_fifo_size;
 } OutputBitstream_t;
 
 
@@ -89,14 +88,16 @@ void WRITE_FLAG
 void WRITE_UVLC
 (
     OutputBitstream_t &bitstream,
-    uint32_t uiCode
+    uint32_t uiCode,
+    const char *name   
 );
 
 
 void WRITE_SVLC
 (
     OutputBitstream_t &bitstream,
-    int32_t iCode
+    int32_t iCode,
+    const char *name   
 );
 
 #endif
