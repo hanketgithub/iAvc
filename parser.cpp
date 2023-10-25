@@ -403,6 +403,11 @@ void ParseSPS(InputBitstream_t &bitstream, SPS_t &sps, AvcInfo_t &pAvcInfo)
     }
 
 
+    while (bitstream.m_num_held_bits)
+    {
+        READ_CODE(bitstream, 1, "trailing_bit");
+    }
+
     sps.profile_idc             = profile_idc;
     sps.constrained_set0_flag   = constraint_set0_flag;
     sps.constrained_set1_flag   = constraint_set1_flag;

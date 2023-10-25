@@ -288,6 +288,8 @@ int main(int argc, char *argv[])
                 bitstream.m_held_bits       = 0;
                 bitstream.m_numBitsRead     = 0;
 
+                EBSPtoRBSP(bitstream.m_fifo, bitstream.m_fifo_size, 0);
+
                 switch (nal_unit_type)
                 {
                     case NALU_TYPE_SPS:
