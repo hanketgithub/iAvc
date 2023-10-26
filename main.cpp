@@ -307,6 +307,7 @@ int main(int argc, char *argv[])
 
                             printf("obs size=%d\n", obs.m_fifo.size());
 
+                            sps.log2_max_frame_num_minus4--; // do customer request...
                             GenerateSPS(obs, sps);
 
                             printf("\n\n--");
@@ -315,6 +316,24 @@ int main(int argc, char *argv[])
                                 printf("0x%02x ", obs.m_fifo[i]);
                             }
                             printf("--\n\n");
+
+                            InputBitstream_t ibs0;
+
+                            ibs0.m_fifo_size    = sizeof(u8EsBuffer) - (prefix_len + SIZE_OF_NAL_UNIT_HDR);
+                            ibs0.m_fifo         = (uint8_t *) calloc(1, ibs0.m_fifo_size);
+                            ibs0.m_fifo_idx      = 0;
+                            ibs0.m_num_held_bits = 0;
+                            ibs0.m_held_bits     = 0;
+                            ibs0.m_numBitsRead   = 0;
+
+                            for (int i = 0; i < obs.m_fifo.size(); i++)
+                            {
+                                ibs0.m_fifo[i] = obs.m_fifo[i];
+                            }
+
+                            SPS_t sps0;
+                            AvcInfo_t aaa;
+                            ParseSPS(ibs0, sps0, aaa);
                         }
                         exit(0);
                         break;
