@@ -79,6 +79,17 @@ void scaling_list(OutputBitstream_t &bitstream, int32_t *scalingListinput, int32
 
 
 static
+void write_rbsp_trailing_bits(OutputBitstream_t &bitstream)
+{
+    WRITE_FLAG(bitstream, 1, "rbsp_stop_one_bit");
+    while (bitstream.m_num_held_bits)
+    {
+        WRITE_FLAG(bitstream, 0, "rbsp_alignment_zero_bit");           
+    }
+}
+
+
+static
 void WriteHRDParameters
 (
     OutputBitstream_t &bitstream,
@@ -293,11 +304,7 @@ void GenerateSPS
         GenerateVUI(bitstream, sps.vui_seq_parameters);
     }
 
-#if 0
-    while (bitstream.m_num_held_bits)
-    {
-        READ_CODE(bitstream, 1, "trailing_bit");
-    }
-#endif
+    // flush out leftover bits
+    write_rbsp_trailing_bits(bitstream);
 }
 

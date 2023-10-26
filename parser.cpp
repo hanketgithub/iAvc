@@ -27,12 +27,25 @@
 using namespace std;
 
 
+
+
+static void rbsp_trailing_bits(InputBitstream_t &bitstream)
+{
+    READ_FLAG(bitstream, "rbsp_stop_one_bit");
+    while (bitstream.m_num_held_bits)
+    {
+        READ_FLAG(bitstream, "rbsp_alignment_zero_bit");
+    }
+}
+
+
 static void scaling_list
 (
     InputBitstream_t &bitstream,
     vector<int32_t> &scalingList,
     int sizeOfScalingList, 
-    bool &useDefaultScalingMatrixFlag) 
+    bool &useDefaultScalingMatrixFlag
+) 
 {
     int lastScale = 8;
     int nextScale = 8;
@@ -237,6 +250,7 @@ static void vui_parameters
     vui.nal_hrd_parameters_present_flag = nal_hrd_parameters_present_flag;
     vui.vcl_hrd_parameters_present_flag = vcl_hrd_parameters_present_flag;
 
+    vui.pic_struct_present_flag = pic_struct_present_flag;
     vui.bitstream_restriction_flag = bitstream_restriction_flag;
     vui.motion_vectors_over_pic_boundaries_flag = motion_vectors_over_pic_boundaries_flag;
     vui.max_bytes_per_pic_denom = max_bytes_per_pic_denom;
@@ -253,12 +267,12 @@ void ParseSPS(InputBitstream_t &bitstream, SPS_t &sps, AvcInfo_t &pAvcInfo)
 {
     uint8_t profile_idc;
 
-    uint8_t constraint_set0_flag;
-    uint8_t constraint_set1_flag;
-    uint8_t constraint_set2_flag;
-    uint8_t constraint_set3_flag;
-    uint8_t constraint_set4_flag;
-    uint8_t constraint_set5_flag;
+    uint8_t constrained_set0_flag;
+    uint8_t constrained_set1_flag;
+    uint8_t constrained_set2_flag;
+    uint8_t constrained_set3_flag;
+    uint8_t constrained_set4_flag;
+    uint8_t constrained_set5_flag;
 
     uint8_t level_idc;
     uint8_t seq_parameter_set_id;
@@ -302,12 +316,12 @@ void ParseSPS(InputBitstream_t &bitstream, SPS_t &sps, AvcInfo_t &pAvcInfo)
 
     profile_idc = READ_CODE(bitstream, 8, "profile_idc");
 
-    constraint_set0_flag = READ_FLAG(bitstream, "constraint_set0_flag");
-    constraint_set1_flag = READ_FLAG(bitstream, "constraint_set1_flag");
-    constraint_set2_flag = READ_FLAG(bitstream, "constraint_set2_flag");
-    constraint_set3_flag = READ_FLAG(bitstream, "constraint_set3_flag");
-    constraint_set4_flag = READ_FLAG(bitstream, "constraint_set4_flag");
-    constraint_set5_flag = READ_FLAG(bitstream, "constraint_set5_flag");
+    constrained_set0_flag = READ_FLAG(bitstream, "constrained_set0_flag");
+    constrained_set1_flag = READ_FLAG(bitstream, "constrained_set1_flag");
+    constrained_set2_flag = READ_FLAG(bitstream, "constrained_set2_flag");
+    constrained_set3_flag = READ_FLAG(bitstream, "constrained_set3_flag");
+    constrained_set4_flag = READ_FLAG(bitstream, "constrained_set4_flag");
+    constrained_set5_flag = READ_FLAG(bitstream, "constrained_set5_flag");
 
     READ_CODE(bitstream, 2, "reserved_zero_2bits");
 
@@ -402,19 +416,16 @@ void ParseSPS(InputBitstream_t &bitstream, SPS_t &sps, AvcInfo_t &pAvcInfo)
         vui_parameters(bitstream, sps.vui_seq_parameters);
     }
 
+    rbsp_trailing_bits(bitstream);
 
-    while (bitstream.m_num_held_bits)
-    {
-        READ_CODE(bitstream, 1, "trailing_bit");
-    }
 
     sps.profile_idc             = profile_idc;
-    sps.constrained_set0_flag   = constraint_set0_flag;
-    sps.constrained_set1_flag   = constraint_set1_flag;
-    sps.constrained_set2_flag   = constraint_set2_flag;
-    sps.constrained_set3_flag   = constraint_set3_flag;
-    sps.constrained_set4_flag   = constraint_set4_flag;
-    sps.constrained_set5_flag   = constraint_set5_flag;
+    sps.constrained_set0_flag   = constrained_set0_flag;
+    sps.constrained_set1_flag   = constrained_set1_flag;
+    sps.constrained_set2_flag   = constrained_set2_flag;
+    sps.constrained_set3_flag   = constrained_set3_flag;
+    sps.constrained_set4_flag   = constrained_set4_flag;
+    sps.constrained_set5_flag   = constrained_set5_flag;
     sps.level_idc               = level_idc;
     sps.seq_parameter_set_id    = seq_parameter_set_id;
 
