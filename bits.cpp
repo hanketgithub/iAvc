@@ -432,7 +432,7 @@ void WRITE_UVLC
 {
     write_uvlc(bitstream, uiCode);
 
-    TRACE("%-50s ue(v)  : %d\n", name, uiCode);
+    TRACE("%-50s ue(v) : %d\n", name, uiCode);
 }
 
 
@@ -449,7 +449,7 @@ void WRITE_SVLC
 
     write_uvlc(bitstream, uiCode);
 
-    TRACE("%-50s se(v)  : %d\n", name, iCode);
+    TRACE("%-50s se(v) : %d\n", name, iCode);
 }
 
 

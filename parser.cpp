@@ -77,7 +77,7 @@ static void hrd_parameters
     }
     initial_cpb_removal_delay_length_minus1 = READ_CODE(bitstream, 5, "initial_cpb_removal_delay_length_minus1");
     cpb_removal_delay_length_minus1 = READ_CODE(bitstream, 5, "cpb_removal_delay_length_minus1");
-    dpb_output_delay_length_minus1 = READ_CODE(bitstream , 5, "dpb_output_delay_length_minus1");
+    dpb_output_delay_length_minus1 = READ_CODE(bitstream, 5, "dpb_output_delay_length_minus1");
     time_offset_length = READ_CODE(bitstream, 5, "time_offset_length");
 
     hrd.cpb_cnt_minus1 = cpb_cnt_minus1;
@@ -138,7 +138,7 @@ static void vui_parameters
         if (aspect_ratio_idc == ASPECT_RATIO_EXTENDED_SAR)
         {
             sar_width = READ_CODE(bitstream, 16, "sar_width");
-            sar_height = READ_CODE(bitstream , 16, "sar_height");
+            sar_height = READ_CODE(bitstream, 16, "sar_height");
         }
     }
 
