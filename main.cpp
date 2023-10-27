@@ -34,8 +34,10 @@
 using namespace std;
 
 
-#define SIZE_OF_NAL_UNIT_HDR    1
-#define ES_BUFFER_SIZE          (3840 * 2160)
+#define ZEROBYTES_SHORTSTARTCODE    2
+#define SIZE_OF_NAL_UNIT_HDR        1
+#define ES_BUFFER_SIZE              (3840 * 2160)
+
 
 static uint8_t u8endCode[] = { 0xFC, 0xFD, 0xFE, 0xFF };
 
@@ -128,6 +130,7 @@ static bool scan_nal
     return ret;
 }
 
+
 static uint32_t EBSPtoRBSP
 (
     uint8_t *streamBuffer,
@@ -183,6 +186,52 @@ static uint32_t EBSPtoRBSP
         j++;
     }
     
+    return j;
+}
+
+
+/*!
+************************************************************************
+*  \brief
+*     This function add emulation_prevention_three_byte for all occurrences
+*     of the following byte sequences in the stream
+*       0x000000  -> 0x00000300
+*       0x000001  -> 0x00000301
+*       0x000002  -> 0x00000302
+*       0x000003  -> 0x00000303
+*
+*  \param NaluBuffer
+*            pointer to target buffer
+*  \param rbsp
+*            pointer to source buffer
+*  \param rbsp_size
+*           Size of source
+*  \return
+*           Size target buffer after emulation prevention.
+*
+************************************************************************
+*/
+int RBSPtoEBSP(uint8_t *NaluBuffer, uint8_t *rbsp, int rbsp_size)
+{
+    int j           = 0;
+    int zero_cnt    = 0;
+
+    for (int i = 0; i < rbsp_size; i++)
+    {
+        if (zero_cnt == ZEROBYTES_SHORTSTARTCODE && !(rbsp[i] & 0xFC))
+        {
+            NaluBuffer[j] = 0x03;
+            j++;
+            zero_cnt = 0;
+        }
+
+        NaluBuffer[j] = rbsp[i];
+
+        if (rbsp[i] == 0x00) { zero_cnt++; }
+        else { zero_cnt = 0; }
+
+        j++;
+    }
     return j;
 }
 
