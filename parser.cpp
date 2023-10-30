@@ -497,7 +497,7 @@ void ParsePPS(InputBitstream_t &bitstream, PPS_t PPSs[], SPS_t SPSs[])
 
     int32_t num_ref_idx_l0_default_active_minus1;               // ue(v)
     int32_t num_ref_idx_l1_default_active_minus1;               // ue(v)
-    bool   weighted_pred_flag;                                  // u(1)
+    bool    weighted_pred_flag;                                 // u(1)
     uint32_t  weighted_bipred_idc;                              // u(2)
     int32_t       pic_init_qp_minus26;                          // se(v)
     int32_t       pic_init_qs_minus26;                          // se(v)
@@ -526,12 +526,88 @@ void ParsePPS(InputBitstream_t &bitstream, PPS_t PPSs[], SPS_t SPSs[])
 
     entropy_coding_mode_flag = READ_FLAG(bitstream, "entropy_coding_mode_flag");
     bottom_field_pic_order_in_frame_present_flag = READ_FLAG(bitstream, "bottom_field_pic_order_in_frame_present_flag");
+    num_slice_groups_minus1 = READ_UVLC(bitstream, "num_slice_groups_minus1");
+    if (num_slice_groups_minus1 > 0)
+    {
+        slice_group_map_type = READ_UVLC(bitstream, "slice_group_map_type");
+        if (slice_group_map_type == 0)
+        {
+            for (int i = 0; i <= num_slice_groups_minus1; i++)
+            {
+                pps.run_length_minus1[i] = READ_UVLC(bitstream, "run_length_minus1");
+            }
+        }
+        else if (slice_group_map_type == 2)
+        {
+            for (int i = 0; i <= num_slice_groups_minus1; i++)
+            {
+                pps.top_left[i]     = READ_UVLC(bitstream, "top_left");
+                pps.bottom_right[i] = READ_UVLC(bitstream, "bottom_right");
+            }
+        }
+        else if (slice_group_map_type == 3 || slice_group_map_type == 4 || slice_group_map_type == 5)
+        {
+            slice_group_change_direction_flag = READ_FLAG(bitstream, "slice_group_change_direction_flag");
+            slice_group_change_rate_minus1 = READ_UVLC(bitstream, "slice_group_change_rate_minus1");
+        }
+        else if (slice_group_map_type == 6)
+        {
+            pic_size_in_map_units_minus1 = READ_UVLC(bitstream, "pic_size_in_map_units_minus1");
+
+            int num_slice_groups = num_slice_groups_minus1 + 1;
+
+            int NumberBitsPerSliceGroupId = 1;
+            if (num_slice_groups > 4)
+            {
+                NumberBitsPerSliceGroupId = 3;
+            }
+            else if (num_slice_groups > 2)
+            {
+                NumberBitsPerSliceGroupId = 2;
+            }
+
+            for (int i = 0; i <= pic_size_in_map_units_minus1; i++)
+            {
+                pps.slice_group_id[i] = READ_CODE(bitstream, NumberBitsPerSliceGroupId, "slice_group_id");
+            }
+        }
+    }
+
+    num_ref_idx_l0_default_active_minus1    = READ_UVLC(bitstream, "num_ref_idx_l0_default_active_minus1");
+    num_ref_idx_l1_default_active_minus1    = READ_UVLC(bitstream, "num_ref_idx_l1_default_active_minus1");
+    weighted_pred_flag                      = READ_FLAG(bitstream, "weighted_pred_flag");
+    weighted_bipred_idc                     = READ_CODE(bitstream, 2, "weighted_bipred_idc");
+    pic_init_qp_minus26                     = READ_SVLC(bitstream, "pic_init_qp_minus26");
+    pic_init_qs_minus26                     = READ_SVLC(bitstream, "pic_init_qs_minus26");
+    chroma_qp_index_offset                  = READ_SVLC(bitstream, "chroma_qp_index_offset");
+    deblocking_filter_control_present_flag  = READ_FLAG(bitstream, "deblocking_filter_control_present_flag");
+    constrained_intra_pred_flag             = READ_FLAG(bitstream, "constrained_intra_pred_flag");
+    redundant_pic_cnt_present_flag          = READ_FLAG(bitstream, "redundant_pic_cnt_present_flag");
 
     pps.pic_parameter_set_id = pic_parameter_set_id;
     pps.seq_parameter_set_id = seq_parameter_set_id;
 
-    pps.entropy_coding_mode_flag = entropy_coding_mode_flag;
-    pps.bottom_field_pic_order_in_frame_present_flag = bottom_field_pic_order_in_frame_present_flag;
+    pps.entropy_coding_mode_flag                        = entropy_coding_mode_flag;
+    pps.bottom_field_pic_order_in_frame_present_flag    = bottom_field_pic_order_in_frame_present_flag;
+    pps.num_slice_groups_minus1                         = num_slice_groups_minus1;
+    pps.slice_group_map_type                            = slice_group_map_type;
+    pps.slice_group_change_direction_flag               = slice_group_change_direction_flag;
+    pps.slice_group_change_rate_minus1                  = slice_group_change_rate_minus1;
+    pps.pic_size_in_map_units_minus1                    = pic_size_in_map_units_minus1;
+
+    pps.num_ref_idx_l0_default_active_minus1    = num_ref_idx_l0_default_active_minus1;
+    pps.num_ref_idx_l1_default_active_minus1    = num_ref_idx_l1_default_active_minus1;
+    pps.weighted_pred_flag                      = weighted_pred_flag;
+    pps.weighted_bipred_idc                     = weighted_bipred_idc;
+    pps.pic_init_qp_minus26                     = pic_init_qp_minus26;
+    pps.pic_init_qs_minus26                     = pic_init_qs_minus26;
+    pps.chroma_qp_index_offset                  = chroma_qp_index_offset;
+    pps.deblocking_filter_control_present_flag  = deblocking_filter_control_present_flag;
+    pps.constrained_intra_pred_flag             = constrained_intra_pred_flag;
+    pps.redundant_pic_cnt_present_flag          = redundant_pic_cnt_present_flag;
+
+    // if (MORE_RBSP_DATA())
+    // ...
 }
 
 
