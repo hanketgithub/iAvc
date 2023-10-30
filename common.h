@@ -177,8 +177,10 @@ typedef struct
 } VUI_t;
 
 
-typedef struct 
+typedef struct
 {
+    bool isValid;
+
     uint8_t profile_idc;                                        // u(8)
 
     bool   constrained_set0_flag;                               // u(1)
@@ -233,6 +235,8 @@ typedef struct
 
 typedef struct
 {
+    bool isValid;
+
     uint32_t pic_parameter_set_id;                              // ue(v)
     uint32_t seq_parameter_set_id;                              // ue(v)
 
@@ -255,10 +259,11 @@ typedef struct
     uint32_t run_length_minus1[MAXnum_slice_groups_minus1];     // ue(v)
     uint32_t top_left[MAXnum_slice_groups_minus1];              // ue(v)
     uint32_t bottom_right[MAXnum_slice_groups_minus1];          // ue(v)
-    bool   slice_group_change_direction_flag;                   // u(1)
+
+    bool     slice_group_change_direction_flag;                 // u(1)
     uint32_t slice_group_change_rate_minus1;                    // ue(v)
     uint32_t pic_size_in_map_units_minus1;                      // ue(v)
-    uint8_t     *slice_group_id;                                // complete MBAmap u(v)
+    uint8_t *slice_group_id;                                    // complete MBAmap u(v)
 
     int32_t num_ref_idx_l0_default_active_minus1;               // ue(v)
     int32_t num_ref_idx_l1_default_active_minus1;               // ue(v)

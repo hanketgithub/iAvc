@@ -263,7 +263,7 @@ static void vui_parameters
 
 
 // 7.3.2.1.1 Sequence parameter set data syntax
-void ParseSPS(InputBitstream_t &bitstream, SPS_t &sps, AvcInfo_t &pAvcInfo)
+void ParseSPS(InputBitstream_t &bitstream, SPS_t SPSs[], AvcInfo_t &pAvcInfo)
 {
     uint8_t profile_idc;
 
@@ -327,6 +327,10 @@ void ParseSPS(InputBitstream_t &bitstream, SPS_t &sps, AvcInfo_t &pAvcInfo)
 
     level_idc = READ_CODE(bitstream, 8, "level_idc");
     seq_parameter_set_id = READ_UVLC(bitstream, "seq_parameter_set_id");
+
+    // Set SPS ID valid
+    SPS_t &sps = SPSs[seq_parameter_set_id];
+    sps.isValid = true;
 
     if (profile_idc == 100 || profile_idc == 110 || profile_idc == 122 || profile_idc == 244
      || profile_idc == 44  || profile_idc == 83  || profile_idc == 86  || profile_idc == 118 
@@ -461,17 +465,78 @@ void ParseSPS(InputBitstream_t &bitstream, SPS_t &sps, AvcInfo_t &pAvcInfo)
 }
 
 
-void ParsePPS(InputBitstream_t &bitstream, PPS_t &pps)
+void ParsePPS(InputBitstream_t &bitstream, PPS_t PPSs[], SPS_t SPSs[])
 {
-    pps.pic_parameter_set_id = READ_UVLC(bitstream, "pic_parameter_set_id");
-    pps.seq_parameter_set_id = READ_UVLC(bitstream, "seq_parameter_set_id");
-    pps.entropy_coding_mode_flag = READ_FLAG(bitstream, "entropy_coding_mode_flag");
-    pps.bottom_field_pic_order_in_frame_present_flag = READ_FLAG(bitstream, "bottom_field_pic_order_in_frame_present_flag");
+    uint32_t pic_parameter_set_id;                              // ue(v)
+    uint32_t seq_parameter_set_id;                              // ue(v)
+
+    bool    entropy_coding_mode_flag;                           // u(1)
+    bool    transform_8x8_mode_flag;                            // u(1)
+
+    bool    pic_scaling_matrix_present_flag;                    // u(1)
+    bool    pic_scaling_list_present_flag[12];                  // u(1)
+
+    int32_t calingList4x4[6][16];                               // se(v)
+    int32_t ScalingList8x8[6][64];                              // se(v)
+
+    bool    UseDefaultScalingMatrix4x4Flag[6];
+    bool    UseDefaultScalingMatrix8x8Flag[6];
+
+    bool    bottom_field_pic_order_in_frame_present_flag;       // u(1)
+
+    uint32_t num_slice_groups_minus1;                           // ue(v)
+    uint32_t slice_group_map_type;                              // ue(v)
+    uint32_t run_length_minus1[MAXnum_slice_groups_minus1];     // ue(v)
+    uint32_t top_left[MAXnum_slice_groups_minus1];              // ue(v)
+    uint32_t bottom_right[MAXnum_slice_groups_minus1];          // ue(v)
+
+    bool     slice_group_change_direction_flag;                 // u(1)
+    uint32_t slice_group_change_rate_minus1;                    // ue(v)
+    uint32_t pic_size_in_map_units_minus1;                      // ue(v)
+    uint8_t *slice_group_id;                                    // complete MBAmap u(v)
+
+    int32_t num_ref_idx_l0_default_active_minus1;               // ue(v)
+    int32_t num_ref_idx_l1_default_active_minus1;               // ue(v)
+    bool   weighted_pred_flag;                                  // u(1)
+    uint32_t  weighted_bipred_idc;                              // u(2)
+    int32_t       pic_init_qp_minus26;                          // se(v)
+    int32_t       pic_init_qs_minus26;                          // se(v)
+    int32_t       chroma_qp_index_offset;                       // se(v)
+
+    int32_t       cb_qp_index_offset;                           // se(v)
+    int32_t       cr_qp_index_offset;                           // se(v)
+    int32_t       second_chroma_qp_index_offset;                // se(v)
+
+    bool   deblocking_filter_control_present_flag;              // u(1)
+    bool   constrained_intra_pred_flag;                         // u(1)
+    bool   redundant_pic_cnt_present_flag;                      // u(1)
+    bool   vui_pic_parameters_flag;                             // u(1)
+
+    pic_parameter_set_id = READ_UVLC(bitstream, "pic_parameter_set_id");
+    seq_parameter_set_id = READ_UVLC(bitstream, "seq_parameter_set_id");
+
+    if (!SPSs[seq_parameter_set_id].isValid)
+    {
+        printf("SPS %d is not activated!\n", seq_parameter_set_id);
+        return;
+    }
+
+    PPS_t &pps = PPSs[pic_parameter_set_id];
+    pps.isValid = true;
+
+    entropy_coding_mode_flag = READ_FLAG(bitstream, "entropy_coding_mode_flag");
+    bottom_field_pic_order_in_frame_present_flag = READ_FLAG(bitstream, "bottom_field_pic_order_in_frame_present_flag");
+
+    pps.pic_parameter_set_id = pic_parameter_set_id;
+    pps.seq_parameter_set_id = seq_parameter_set_id;
+
+    pps.entropy_coding_mode_flag = entropy_coding_mode_flag;
+    pps.bottom_field_pic_order_in_frame_present_flag = bottom_field_pic_order_in_frame_present_flag;
 }
 
 
 // 7.3.3 Slice header syntax
-void ParseSliceHeader(InputBitstream_t &bitstream, SPS_t &sps, PPS_t &pps, bool IdrPicFlag, string &message)
+void ParseSliceHeader(InputBitstream_t &bitstream, SPS_t SPSs[], PPS_t PPSs[], bool IdrPicFlag, string &message)
 {
     uint32_t first_mb_in_slice;
     uint32_t slice_type;
@@ -486,6 +551,15 @@ void ParseSliceHeader(InputBitstream_t &bitstream, SPS_t &sps, PPS_t &pps, bool 
     first_mb_in_slice       = READ_UVLC(bitstream, "first_mb_in_slice");
     slice_type              = READ_UVLC(bitstream, "slice_type");
     pic_parameter_set_id    = READ_UVLC(bitstream, "pic_parameter_set_id");
+
+    if (!PPSs[pic_parameter_set_id].isValid)
+    {
+        printf("PPS %d is not activated!\n", pic_parameter_set_id);
+        return;
+    }
+
+    PPS_t &pps = PPSs[pic_parameter_set_id];
+    SPS_t &sps = SPSs[ pps.seq_parameter_set_id ];
 
     if (sps.separate_colour_plane_flag)
     {

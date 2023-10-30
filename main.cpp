@@ -45,9 +45,9 @@ static uint8_t u8EsBuffer[ES_BUFFER_SIZE + sizeof(u8endCode)];
 
 static AvcInfo_t tAvcInfo;
 
-static SPS_t sps;
+static SPS_t SPSs[32];
 
-static PPS_t pps;
+static PPS_t PPSs[32];
 
 string message;
 
@@ -211,6 +211,7 @@ static uint32_t EBSPtoRBSP
 *
 ************************************************************************
 */
+#if 0
 int RBSPtoEBSP(uint8_t *NaluBuffer, uint8_t *rbsp, int rbsp_size)
 {
     int j           = 0;
@@ -232,8 +233,30 @@ int RBSPtoEBSP(uint8_t *NaluBuffer, uint8_t *rbsp, int rbsp_size)
 
         j++;
     }
+
     return j;
 }
+#else
+int RBSPtoEBSP(vector<uint8_t> &ebsp, vector<uint8_t> &rbsp)
+{
+    int zero_cnt    = 0;
+
+    for (int i = 0; i < rbsp.size(); i++)
+    {
+        if (zero_cnt == ZEROBYTES_SHORTSTARTCODE && !(rbsp[i] & 0xFC))
+        {
+            ebsp.push_back(0x03);
+            zero_cnt = 0;
+        }
+        ebsp.push_back(rbsp[i]);
+
+        if (rbsp[i] == 0x00) { zero_cnt++; }
+        else { zero_cnt = 0; }
+    }
+
+    return ebsp.size();
+}
+#endif
 
 
 int main(int argc, char *argv[])
@@ -344,7 +367,7 @@ int main(int argc, char *argv[])
                 {
                     case NALU_TYPE_SPS:
                     {
-                        ParseSPS(ibs, sps, tAvcInfo);
+                        ParseSPS(ibs, SPSs, tAvcInfo);
 
                         // Simple test
                         {
@@ -356,40 +379,55 @@ int main(int argc, char *argv[])
 
                             printf("obs size=%d\n", obs.m_fifo.size());
 
-                            sps.log2_max_frame_num_minus4--; // do customer request...
-                            GenerateSPS(obs, sps);
-
-                            printf("\n\n--");
-                            for (int i = 0; i < obs.m_fifo.size(); i++)
+                            //if (SPSs[0].isValid) // assume sps id is 0
+                            if (0)
                             {
-                                printf("0x%02x ", obs.m_fifo[i]);
+                                SPSs[0].log2_max_frame_num_minus4--; // do customer request...
+                                GenerateSPS(obs, SPSs[0]);
+
+                                printf("\n\n--");
+                                for (int i = 0; i < obs.m_fifo.size(); i++)
+                                {
+                                    printf("0x%02x ", obs.m_fifo[i]);
+                                }
+                                printf("--\n\n");
+
+                                InputBitstream_t ibs0;
+
+                                ibs0.m_fifo_size    = sizeof(u8EsBuffer) - (prefix_len + SIZE_OF_NAL_UNIT_HDR);
+                                ibs0.m_fifo         = (uint8_t *) calloc(1, ibs0.m_fifo_size);
+                                ibs0.m_fifo_idx      = 0;
+                                ibs0.m_num_held_bits = 0;
+                                ibs0.m_held_bits     = 0;
+                                ibs0.m_numBitsRead   = 0;
+
+                                for (int i = 0; i < obs.m_fifo.size(); i++)
+                                {
+                                    ibs0.m_fifo[i] = obs.m_fifo[i];
+                                }
+
+                                SPS_t sps0;
+                                AvcInfo_t aaa;
+                                ParseSPS(ibs0, SPSs, aaa);
+
+                                vector<uint8_t> ebsp;
+                                
+                                RBSPtoEBSP(ebsp, obs.m_fifo);
+
+                                printf("\n\n--EBSP: ");
+                                for (int i = 0; i < ebsp.size(); i++)
+                                {
+                                    printf("0x%02x ", ebsp[i]);
+                                }
+                                printf("--\n\n");
                             }
-                            printf("--\n\n");
-
-                            InputBitstream_t ibs0;
-
-                            ibs0.m_fifo_size    = sizeof(u8EsBuffer) - (prefix_len + SIZE_OF_NAL_UNIT_HDR);
-                            ibs0.m_fifo         = (uint8_t *) calloc(1, ibs0.m_fifo_size);
-                            ibs0.m_fifo_idx      = 0;
-                            ibs0.m_num_held_bits = 0;
-                            ibs0.m_held_bits     = 0;
-                            ibs0.m_numBitsRead   = 0;
-
-                            for (int i = 0; i < obs.m_fifo.size(); i++)
-                            {
-                                ibs0.m_fifo[i] = obs.m_fifo[i];
-                            }
-
-                            SPS_t sps0;
-                            AvcInfo_t aaa;
-                            ParseSPS(ibs0, sps0, aaa);
                         }
-                        exit(0);
+                        //exit(0);
                         break;
                     }
                     case NALU_TYPE_PPS:
                     {
-                        ParsePPS(ibs, pps);
+                        ParsePPS(ibs, PPSs, SPSs);
 
                         break;
                     }
@@ -401,7 +439,7 @@ int main(int argc, char *argv[])
                     }
                     case NALU_TYPE_SLICE:
                     {
-                        ParseSliceHeader(ibs, sps, pps, false, message);
+                        ParseSliceHeader(ibs, SPSs, PPSs, false, message);
 
                         break;
                     }

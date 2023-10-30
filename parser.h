@@ -4,11 +4,11 @@
 #define ___I_AVC_PARSER_H___
 
 
-extern void ParseSPS(InputBitstream_t &bitstream, SPS_t &sps, AvcInfo_t &pAvcInfo);
+extern void ParseSPS(InputBitstream_t &bitstream, SPS_t SPSs[], AvcInfo_t &pAvcInfo);
 
-extern void ParsePPS(InputBitstream_t &bitstream, PPS_t &pps);
+extern void ParsePPS(InputBitstream_t &bitstream, PPS_t PPSs[], SPS_t SPSs[]);
 
-extern void ParseSliceHeader(InputBitstream_t &bitstream, SPS_t &sps, PPS_t &pps, bool IdrPicFlag, std::string &message);
+extern void ParseSliceHeader(InputBitstream_t &bitstream, SPS_t SPSs[], PPS_t PPSs[], bool IdrPicFlag, std::string &message);
 
 
 #endif
