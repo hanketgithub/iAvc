@@ -326,13 +326,102 @@ static void ref_pic_list_modification(InputBitstream_t &bitstream, SliceType sli
 }
 
 
-static void pred_weight_table()
+static void pred_weight_table(InputBitstream_t &bitstream, Slice_t &slice, SPS_t &sps, SliceType slice_type)
 {
+    slice.luma_log2_weight_denom = READ_UVLC(bitstream, "luma_log2_weight_denom");
+
+    if (sps.chroma_format_idc != 0)
+    {
+        slice.chroma_log2_weight_denom = READ_UVLC(bitstream, "chroma_log2_weight_denom");
+    }
+
+    for (uint32_t i = 0; i <= slice.num_ref_idx_l0_active_minus1; i++)
+    {
+        slice.luma_weight_l0_flag = READ_FLAG(bitstream, "luma_weight_l0_flag");
+        if (slice.luma_weight_l0_flag)
+        {
+            slice.luma_weight_l0[LIST_0][i] = READ_SVLC(bitstream, "luma_weight_l0");
+            slice.luma_offset_l0[LIST_0][i] = READ_SVLC(bitstream, "luma_offset_l0");
+        }
+
+        if (sps.chroma_format_idc != 0)
+        {
+            slice.chroma_weight_l0_flag = READ_FLAG(bitstream, "chroma_weight_l0_flag");
+            if (slice.chroma_weight_l0_flag)
+            {
+                for (int j = 0; j < 2; j++)
+                {
+                    slice.chroma_weight_l0[LIST_0][i][j] = READ_SVLC(bitstream, "chroma_weight_l0");
+                    slice.chroma_offset_l0[LIST_0][i][j] = READ_SVLC(bitstream, "chroma_offset_l0");
+                }
+            }
+        }
+    }
+
+    if (slice_type % 5 == 1)
+    {
+        for (uint32_t i = 0; i <= slice.num_ref_idx_l1_active_minus1; i++)
+        {
+            slice.luma_weight_l1_flag = READ_FLAG(bitstream, "luma_weight_l1_flag");
+            if (slice.luma_weight_l1_flag)
+            {
+                slice.luma_weight_l1[LIST_0][i] = READ_SVLC(bitstream, "luma_weight_l1");
+                slice.luma_offset_l1[LIST_0][i] = READ_SVLC(bitstream, "luma_offset_l1");
+            }
+
+            if (sps.chroma_format_idc != 0)
+            {
+                slice.chroma_weight_l1_flag = READ_FLAG(bitstream, "chroma_weight_l1_flag");
+                if (slice.chroma_weight_l1_flag)
+                {
+                    for (int j = 0; j < 2; j++)
+                    {
+                        slice.chroma_weight_l1[LIST_0][i][j] = READ_SVLC(bitstream, "chroma_weight_l1");
+                        slice.chroma_offset_l1[LIST_0][i][j] = READ_SVLC(bitstream, "chroma_offset_l1");
+                    }
+                }
+            }
+        }
+    }
 }
 
 
-static void dec_ref_pic_marking()
+static void dec_ref_pic_marking(InputBitstream_t &bitstream, Slice_t &slice, bool IdrPicFlag)
 {
+    if (IdrPicFlag)
+    {
+        slice.no_output_of_prior_pics_flag = READ_FLAG(bitstream, "no_output_of_prior_pics_flag");
+        slice.long_term_reference_flag = READ_FLAG(bitstream, "long_term_reference_flag");
+    }
+    else
+    {
+        slice.adaptive_ref_pic_marking_mode_flag = READ_FLAG(bitstream, "adaptive_ref_pic_marking_mode_flag");
+
+        if (slice.adaptive_ref_pic_marking_mode_flag)
+        {
+            uint32_t memory_management_control_operation;
+            do
+            {
+                memory_management_control_operation = READ_UVLC(bitstream, "memory_management_control_operation");
+                if (memory_management_control_operation == 1 || memory_management_control_operation == 3)
+                {
+                    slice.difference_of_pic_nums_minus1 = READ_UVLC(bitstream, "");
+                }
+                if (memory_management_control_operation == 2)
+                {
+                    slice.long_term_pic_num = READ_UVLC(bitstream, "long_term_pic_num");
+                }
+                if (memory_management_control_operation == 3 || memory_management_control_operation == 6)
+                {
+                    slice.long_term_frame_idx = READ_UVLC(bitstream, "long_term_frame_idx");
+                }
+                if (memory_management_control_operation == 4)
+                {
+                    slice.max_long_term_frame_idx_plus1 = READ_UVLC(bitstream, "max_long_term_frame_idx_plus1");
+                }
+            } while (memory_management_control_operation != 0);
+        }
+    }
 }
 
 
@@ -804,12 +893,12 @@ void ParseSliceHeader
     if ( (pps.weighted_pred_flag && (slice_type == P_SLICE || slice_type == SP_SLICE))
       || (pps.weighted_bipred_idc == 1 && slice_type == B_SLICE) )
     {
-        pred_weight_table();
+        pred_weight_table(bitstream, slice, sps, slice_type);
     }
 
     if (nal_ref_idc != 0)
     {
-        dec_ref_pic_marking();
+        dec_ref_pic_marking(bitstream, slice, IdrPicFlag);
     }
 
     if (pps.entropy_coding_mode_flag && slice_type != I_SLICE && slice_type != SI_SLICE)
@@ -858,5 +947,8 @@ void ParseSliceHeader
     slice.pic_parameter_set_id  = pic_parameter_set_id;
     slice.colour_plane_id       = colour_plane_id;
     slice.frame_num             = frame_num;
+
+    slice.num_ref_idx_l0_active_minus1 = num_ref_idx_l0_active_minus1;
+    slice.num_ref_idx_l1_active_minus1 = num_ref_idx_l1_active_minus1;
 }
 

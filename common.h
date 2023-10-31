@@ -110,12 +110,24 @@ typedef enum
     NUM_SLICE_TYPES = 5
 } SliceType;
 
+
 typedef enum
 {
     PIC_STRUCT_FRAME,
     PIC_STRUCT_FIELD_TOP,
     PIC_STRUCT_FIELD_BOT,
 } PicStruct;
+
+
+enum
+{
+    LIST_0 = 0,
+    LIST_1 = 1,
+    BI_PRED = 2,
+    BI_PRED_L0 = 3,
+    BI_PRED_L1 = 4
+};
+
 
 
 typedef struct
@@ -285,6 +297,7 @@ typedef struct
     bool   vui_pic_parameters_flag;                             // u(1)
 } PPS_t;
 
+#define MAX_REFERENCE_PICTURES  32
 
 typedef struct
 {
@@ -293,6 +306,36 @@ typedef struct
     uint32_t pic_parameter_set_id;
     uint8_t colour_plane_id;
     uint16_t frame_num;
+
+    uint32_t num_ref_idx_l0_active_minus1;
+    uint32_t num_ref_idx_l1_active_minus1;
+
+    uint32_t    luma_log2_weight_denom;
+    uint32_t    chroma_log2_weight_denom;
+
+    bool        luma_weight_l0_flag;
+    int32_t     luma_weight_l0[2][MAX_REFERENCE_PICTURES];
+    int32_t     luma_offset_l0[6][MAX_REFERENCE_PICTURES];
+
+    bool        chroma_weight_l0_flag;
+    int32_t     chroma_weight_l0[2][MAX_REFERENCE_PICTURES][2];
+    int32_t     chroma_offset_l0[6][MAX_REFERENCE_PICTURES][2];
+
+    bool        luma_weight_l1_flag;
+    int32_t     luma_weight_l1[2][MAX_REFERENCE_PICTURES];
+    int32_t     luma_offset_l1[6][MAX_REFERENCE_PICTURES];
+
+    bool        chroma_weight_l1_flag;
+    int32_t     chroma_weight_l1[2][MAX_REFERENCE_PICTURES][2];
+    int32_t     chroma_offset_l1[6][MAX_REFERENCE_PICTURES][2];
+
+    bool        no_output_of_prior_pics_flag;
+    bool        long_term_reference_flag;
+    bool        adaptive_ref_pic_marking_mode_flag;
+    uint32_t    difference_of_pic_nums_minus1;
+    uint32_t    long_term_pic_num;
+    uint32_t    long_term_frame_idx;
+    uint32_t    max_long_term_frame_idx_plus1;
 } Slice_t;
 
 
