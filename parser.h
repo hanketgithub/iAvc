@@ -11,6 +11,7 @@ extern void ParsePPS(InputBitstream_t &bitstream, PPS_t PPSs[], SPS_t SPSs[]);
 extern void ParseSliceHeader
 (
     InputBitstream_t &bitstream,
+    Slice_t &slice,
     SPS_t SPSs[],
     PPS_t PPSs[],
     bool IdrPicFlag,

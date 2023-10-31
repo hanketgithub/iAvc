@@ -49,6 +49,8 @@ static SPS_t SPSs[32];
 
 static PPS_t PPSs[32];
 
+static Slice_t curSlice;
+
 string message;
 
 
@@ -439,7 +441,7 @@ int main(int argc, char *argv[])
                     }
                     case NALU_TYPE_SLICE:
                     {
-                        ParseSliceHeader(ibs, SPSs, PPSs, false, nal_ref_idc, message);
+                        ParseSliceHeader(ibs, curSlice, SPSs, PPSs, false, nal_ref_idc, message);
 
                         break;
                     }

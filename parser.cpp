@@ -28,6 +28,19 @@ using namespace std;
 
 
 
+static uint32_t CeilLog2(uint32_t uiVal)
+{
+    unsigned uiTmp = uiVal-1;
+    unsigned uiRet = 0;
+    
+    while (uiTmp != 0)
+    {
+        uiTmp >>= 1;
+        uiRet++;
+    }
+    return uiRet;
+}
+
 
 static void rbsp_trailing_bits(InputBitstream_t &bitstream)
 {
@@ -263,8 +276,53 @@ static void vui_parameters
 
 
 // 7.3.3.1 Reference picture list modification syntax
-static void ref_pic_list_modification()
+static void ref_pic_list_modification(InputBitstream_t &bitstream, SliceType slice_type)
 {
+    bool ref_pic_list_modification_flag_l0 = false;
+    bool ref_pic_list_modification_flag_l1 = false;
+    uint32_t modification_of_pic_nums_idc;
+    uint32_t abs_diff_pic_num_minus1;
+    uint32_t long_term_pic_num;
+
+    if (slice_type % 5 != 2 && slice_type % 5 != 4)
+    {
+        ref_pic_list_modification_flag_l0 = READ_FLAG(bitstream, "ref_pic_list_modification_flag_l0");
+        if (ref_pic_list_modification_flag_l0)
+        {
+            do
+            {
+                modification_of_pic_nums_idc = READ_UVLC(bitstream, "modification_of_pic_nums_idc");
+                if (modification_of_pic_nums_idc == 0 || modification_of_pic_nums_idc == 1)
+                {
+                    abs_diff_pic_num_minus1 = READ_UVLC(bitstream, "abs_diff_pic_num_minus1");
+                }
+                else if (modification_of_pic_nums_idc == 2)
+                {
+                    long_term_pic_num = READ_UVLC(bitstream, "long_term_pic_num");
+                }
+            } while (modification_of_pic_nums_idc != 3);
+        }
+    }
+
+    if (slice_type % 5 == 1)
+    {
+        ref_pic_list_modification_flag_l1 = READ_FLAG(bitstream, "ref_pic_list_modification_flag_l1");
+        if (ref_pic_list_modification_flag_l1)
+        {
+            do
+            {
+                modification_of_pic_nums_idc = READ_UVLC(bitstream, "modification_of_pic_nums_idc");
+                if (modification_of_pic_nums_idc == 0 || modification_of_pic_nums_idc == 1)
+                {
+                    abs_diff_pic_num_minus1 = READ_UVLC(bitstream, "abs_diff_pic_num_minus1");
+                }
+                else if (modification_of_pic_nums_idc == 2)
+                {
+                    long_term_pic_num = READ_UVLC(bitstream, "long_term_pic_num");
+                }
+            } while (modification_of_pic_nums_idc != 3);
+        }
+    }
 }
 
 
@@ -632,6 +690,7 @@ void ParsePPS(InputBitstream_t &bitstream, PPS_t PPSs[], SPS_t SPSs[])
 void ParseSliceHeader
 (
     InputBitstream_t &bitstream,
+    Slice_t &slice,
     SPS_t SPSs[],
     PPS_t PPSs[],
     bool IdrPicFlag,
@@ -740,7 +799,7 @@ void ParseSliceHeader
         }
     }
 
-    ref_pic_list_modification();
+    ref_pic_list_modification(bitstream, slice_type);
 
     if ( (pps.weighted_pred_flag && (slice_type == P_SLICE || slice_type == SP_SLICE))
       || (pps.weighted_bipred_idc == 1 && slice_type == B_SLICE) )
@@ -789,9 +848,15 @@ void ParseSliceHeader
             len += 1;
         }
 
-        //len = CeilLog2(len + 1);
+        len = CeilLog2(len + 1);
 
         slice_group_change_cycle = READ_CODE(bitstream, len, "slice_group_change_cycle");
     }
+
+    slice.first_mb_in_slice     = first_mb_in_slice;
+    slice.slice_type            = slice_type;
+    slice.pic_parameter_set_id  = pic_parameter_set_id;
+    slice.colour_plane_id       = colour_plane_id;
+    slice.frame_num             = frame_num;
 }
 
