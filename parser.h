@@ -8,8 +8,15 @@ extern void ParseSPS(InputBitstream_t &bitstream, SPS_t SPSs[], AvcInfo_t &pAvcI
 
 extern void ParsePPS(InputBitstream_t &bitstream, PPS_t PPSs[], SPS_t SPSs[]);
 
-extern void ParseSliceHeader(InputBitstream_t &bitstream, SPS_t SPSs[], PPS_t PPSs[], bool IdrPicFlag, std::string &message);
-
+extern void ParseSliceHeader
+(
+    InputBitstream_t &bitstream,
+    SPS_t SPSs[],
+    PPS_t PPSs[],
+    bool IdrPicFlag,
+    uint8_t nal_ref_idc,
+    std::string &message
+);
 
 #endif
 

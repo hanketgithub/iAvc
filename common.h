@@ -102,11 +102,13 @@ typedef enum
 
 typedef enum
 {
-    B_SLICE,
-    P_SLICE,
-    I_SLICE,
+    P_SLICE = 0,
+    B_SLICE = 1,
+    I_SLICE = 2,
+    SP_SLICE = 3,
+    SI_SLICE = 4,
+    NUM_SLICE_TYPES = 5
 } SliceType;
-
 
 typedef enum
 {
@@ -287,7 +289,7 @@ typedef struct
 typedef struct
 {
     uint32_t first_mb_in_slice;
-    uint32_t slice_type;
+    SliceType slice_type;
     uint32_t pic_parameter_set_id;
     uint8_t colour_plane_id;
     uint16_t frame_num;

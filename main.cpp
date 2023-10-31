@@ -439,7 +439,7 @@ int main(int argc, char *argv[])
                     }
                     case NALU_TYPE_SLICE:
                     {
-                        ParseSliceHeader(ibs, SPSs, PPSs, false, message);
+                        ParseSliceHeader(ibs, SPSs, PPSs, false, nal_ref_idc, message);
 
                         break;
                     }
