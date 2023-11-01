@@ -788,6 +788,7 @@ void ParseSliceHeader
 )
 {
     uint32_t first_mb_in_slice;
+    uint32_t tmp;
     SliceType slice_type;
     uint32_t pic_parameter_set_id;
     uint8_t colour_plane_id;
@@ -811,10 +812,11 @@ void ParseSliceHeader
     int32_t slice_beta_offset_div2 = 0;
     uint32_t slice_group_change_cycle = 0;
 
-
     first_mb_in_slice       = READ_UVLC(bitstream, "first_mb_in_slice");
-    slice_type              = (SliceType) READ_UVLC(bitstream, "slice_type");
+    tmp                     = READ_UVLC(bitstream, "slice_type");
     pic_parameter_set_id    = READ_UVLC(bitstream, "pic_parameter_set_id");
+
+    slice_type = (SliceType) (tmp % 5);
 
     if (!PPSs[pic_parameter_set_id].isValid)
     {

@@ -47,7 +47,7 @@ static AvcInfo_t tAvcInfo;
 
 static SPS_t SPSs[32];
 
-static PPS_t PPSs[32];
+static PPS_t PPSs[128];
 
 static Slice_t curSlice;
 
