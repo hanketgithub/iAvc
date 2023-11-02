@@ -379,7 +379,7 @@ int main(int argc, char *argv[])
                             obs.m_held_bits     = 0;
                             obs.m_fifo_idx      = 0;
 
-                            printf("obs size=%d\n", obs.m_fifo.size());
+                            printf("obs size=%lu\n", obs.m_fifo.size());
 
                             //if (SPSs[0].isValid) // assume sps id is 0
                             if (0)
@@ -439,9 +439,12 @@ int main(int argc, char *argv[])
 
                         break;
                     }
+                    case NALU_TYPE_IDR:
                     case NALU_TYPE_SLICE:
                     {
-                        ParseSliceHeader(ibs, curSlice, SPSs, PPSs, false, nal_ref_idc, message);
+                        bool IdrPicFlag = ( ( nal_unit_type == 5 ) ? 1 : 0 );
+                    
+                        ParseSliceHeader(ibs, curSlice, SPSs, PPSs, IdrPicFlag, nal_ref_idc, message);
 
                         break;
                     }

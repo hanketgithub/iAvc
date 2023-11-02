@@ -301,14 +301,28 @@ typedef struct
 
 typedef struct
 {
-    uint32_t first_mb_in_slice;
-    SliceType slice_type;
-    uint32_t pic_parameter_set_id;
-    uint8_t colour_plane_id;
-    uint16_t frame_num;
+    uint32_t    first_mb_in_slice;
+    SliceType   slice_type;
+    uint32_t    pic_parameter_set_id;
+    uint8_t     colour_plane_id;
+    uint16_t    frame_num;
+    bool        field_pic_flag;
+    bool        bottom_field_flag;
+    uint32_t    idr_pic_id;
+    uint32_t    pic_order_cnt_lsb;
+    int32_t     delta_pic_order_cnt_bottom;
+    int32_t     delta_pic_order_cnt[2];
 
-    uint32_t num_ref_idx_l0_active_minus1;
-    uint32_t num_ref_idx_l1_active_minus1;
+    uint32_t redundant_pic_cnt;
+
+    bool direct_spatial_mv_pred_flag;
+
+    bool        num_ref_idx_active_override_flag;
+    uint32_t    num_ref_idx_l0_active_minus1;
+    uint32_t    num_ref_idx_l1_active_minus1;
+
+    bool        ref_pic_list_modification_flag_l0;
+    bool        ref_pic_list_modification_flag_l1;
 
     uint32_t    luma_log2_weight_denom;
     uint32_t    chroma_log2_weight_denom;
@@ -336,6 +350,17 @@ typedef struct
     uint32_t    long_term_pic_num;
     uint32_t    long_term_frame_idx;
     uint32_t    max_long_term_frame_idx_plus1;
+
+    uint32_t    cabac_init_idc;
+
+    int32_t     slice_qp_delta;
+    bool        sp_for_switch_flag;
+    int32_t     slice_qs_delta;
+
+    uint32_t    disable_deblocking_filter_idc;
+    int32_t     slice_alpha_c0_offset_div2;
+    int32_t     slice_beta_offset_div2;
+    uint32_t    slice_group_change_cycle;
 } Slice_t;
 
 

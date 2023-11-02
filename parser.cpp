@@ -276,29 +276,30 @@ static void vui_parameters
 
 
 // 7.3.3.1 Reference picture list modification syntax
-static void ref_pic_list_modification(InputBitstream_t &bitstream, SliceType slice_type)
+static void ref_pic_list_modification(InputBitstream_t &ibs, Slice_t &slice)
 {
     bool ref_pic_list_modification_flag_l0 = false;
     bool ref_pic_list_modification_flag_l1 = false;
     uint32_t modification_of_pic_nums_idc;
     uint32_t abs_diff_pic_num_minus1;
     uint32_t long_term_pic_num;
+    SliceType slice_type = slice.slice_type;
 
     if (slice_type % 5 != 2 && slice_type % 5 != 4)
     {
-        ref_pic_list_modification_flag_l0 = READ_FLAG(bitstream, "ref_pic_list_modification_flag_l0");
+        ref_pic_list_modification_flag_l0 = READ_FLAG(ibs, "ref_pic_list_modification_flag_l0");
         if (ref_pic_list_modification_flag_l0)
         {
             do
             {
-                modification_of_pic_nums_idc = READ_UVLC(bitstream, "modification_of_pic_nums_idc");
+                modification_of_pic_nums_idc = READ_UVLC(ibs, "modification_of_pic_nums_idc");
                 if (modification_of_pic_nums_idc == 0 || modification_of_pic_nums_idc == 1)
                 {
-                    abs_diff_pic_num_minus1 = READ_UVLC(bitstream, "abs_diff_pic_num_minus1");
+                    abs_diff_pic_num_minus1 = READ_UVLC(ibs, "abs_diff_pic_num_minus1");
                 }
                 else if (modification_of_pic_nums_idc == 2)
                 {
-                    long_term_pic_num = READ_UVLC(bitstream, "long_term_pic_num");
+                    long_term_pic_num = READ_UVLC(ibs, "long_term_pic_num");
                 }
             } while (modification_of_pic_nums_idc != 3);
         }
@@ -306,23 +307,28 @@ static void ref_pic_list_modification(InputBitstream_t &bitstream, SliceType sli
 
     if (slice_type % 5 == 1)
     {
-        ref_pic_list_modification_flag_l1 = READ_FLAG(bitstream, "ref_pic_list_modification_flag_l1");
+        ref_pic_list_modification_flag_l1 = READ_FLAG(ibs, "ref_pic_list_modification_flag_l1");
         if (ref_pic_list_modification_flag_l1)
         {
             do
             {
-                modification_of_pic_nums_idc = READ_UVLC(bitstream, "modification_of_pic_nums_idc");
+                modification_of_pic_nums_idc = READ_UVLC(ibs, "modification_of_pic_nums_idc");
                 if (modification_of_pic_nums_idc == 0 || modification_of_pic_nums_idc == 1)
                 {
-                    abs_diff_pic_num_minus1 = READ_UVLC(bitstream, "abs_diff_pic_num_minus1");
+                    abs_diff_pic_num_minus1 = READ_UVLC(ibs, "abs_diff_pic_num_minus1");
                 }
                 else if (modification_of_pic_nums_idc == 2)
                 {
-                    long_term_pic_num = READ_UVLC(bitstream, "long_term_pic_num");
+                    long_term_pic_num = READ_UVLC(ibs, "long_term_pic_num");
                 }
             } while (modification_of_pic_nums_idc != 3);
         }
     }
+
+    slice.ref_pic_list_modification_flag_l0 = ref_pic_list_modification_flag_l0;
+
+    
+    slice.ref_pic_list_modification_flag_l1 = ref_pic_list_modification_flag_l1;
 }
 
 
@@ -787,18 +793,20 @@ void ParseSliceHeader
     string &message
 )
 {
-    uint32_t first_mb_in_slice;
-    uint32_t tmp;
-    SliceType slice_type;
-    uint32_t pic_parameter_set_id;
-    uint8_t colour_plane_id;
-    uint16_t frame_num;
-    bool field_pic_flag;
-    bool bottom_field_flag;
-    uint32_t idr_pic_id;
-    uint32_t pic_order_cnt_lsb;
-    int32_t delta_pic_order_cnt[2];
-    uint32_t redundant_pic_cnt;
+    uint32_t first_mb_in_slice  = 0;
+    uint32_t tmp                = 0;
+    SliceType slice_type        = P_SLICE;
+
+    uint32_t pic_parameter_set_id   = 0;
+    uint8_t colour_plane_id         = 0;
+    uint16_t frame_num              = 0;
+    bool field_pic_flag             = false;
+    bool bottom_field_flag          = false;
+    uint32_t idr_pic_id             = 0;
+    uint32_t pic_order_cnt_lsb      = 0;
+    int32_t delta_pic_order_cnt_bottom = 0;
+    int32_t delta_pic_order_cnt[2] = {0};
+    uint32_t redundant_pic_cnt = 0;
     bool direct_spatial_mv_pred_flag = false;
     bool num_ref_idx_active_override_flag = false;
     uint32_t num_ref_idx_l0_active_minus1 = 0;
@@ -854,7 +862,7 @@ void ParseSliceHeader
         pic_order_cnt_lsb = READ_CODE(bitstream, (sps.log2_max_pic_order_cnt_lsb_minus4 + 4), "pic_order_cnt_lsb");
         if (pps.bottom_field_pic_order_in_frame_present_flag && !field_pic_flag)
         {
-            int32_t delta_pic_order_cnt_bottom = READ_SVLC(bitstream, "delta_pic_order_cnt_bottom");
+            delta_pic_order_cnt_bottom = READ_SVLC(bitstream, "delta_pic_order_cnt_bottom");
         }
     }
 
@@ -890,7 +898,7 @@ void ParseSliceHeader
         }
     }
 
-    ref_pic_list_modification(bitstream, slice_type);
+    ref_pic_list_modification(bitstream, slice);
 
     if ( (pps.weighted_pred_flag && (slice_type == P_SLICE || slice_type == SP_SLICE))
       || (pps.weighted_bipred_idc == 1 && slice_type == B_SLICE) )
@@ -949,8 +957,30 @@ void ParseSliceHeader
     slice.pic_parameter_set_id  = pic_parameter_set_id;
     slice.colour_plane_id       = colour_plane_id;
     slice.frame_num             = frame_num;
+    slice.field_pic_flag        = field_pic_flag;
+    slice.bottom_field_flag     = bottom_field_flag;
+    slice.idr_pic_id            = idr_pic_id;
+    slice.pic_order_cnt_lsb     = pic_order_cnt_lsb;
+    slice.delta_pic_order_cnt_bottom = delta_pic_order_cnt_bottom;
+    slice.delta_pic_order_cnt[0] = delta_pic_order_cnt[0];
 
-    slice.num_ref_idx_l0_active_minus1 = num_ref_idx_l0_active_minus1;
-    slice.num_ref_idx_l1_active_minus1 = num_ref_idx_l1_active_minus1;
+
+    slice.redundant_pic_cnt = redundant_pic_cnt;
+
+    slice.direct_spatial_mv_pred_flag = direct_spatial_mv_pred_flag;
+
+    slice.num_ref_idx_active_override_flag  = num_ref_idx_active_override_flag;
+    slice.num_ref_idx_l0_active_minus1      = num_ref_idx_l0_active_minus1;
+    slice.num_ref_idx_l1_active_minus1      = num_ref_idx_l1_active_minus1;
+
+    slice.cabac_init_idc        = cabac_init_idc;
+    slice.slice_qp_delta        = slice_qp_delta;
+    slice.sp_for_switch_flag    = sp_for_switch_flag;
+    slice.slice_qs_delta        = slice_qs_delta;
+
+    slice.disable_deblocking_filter_idc = disable_deblocking_filter_idc;
+    slice.slice_alpha_c0_offset_div2    = slice_alpha_c0_offset_div2;
+    slice.slice_beta_offset_div2        = slice_beta_offset_div2;
+    slice.slice_group_change_cycle      = slice_group_change_cycle;
 }
 

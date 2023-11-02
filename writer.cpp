@@ -38,7 +38,6 @@ static const uint8_t ZZ_SCAN8[64] =
 };
 
 
-
 static
 void scaling_list(OutputBitstream_t &bitstream, int32_t *scalingListinput, int32_t *scalingList, int sizeOfScalingList, bool *UseDefaultScalingMatrix)
 {
@@ -86,6 +85,50 @@ void write_rbsp_trailing_bits(OutputBitstream_t &bitstream)
     {
         WRITE_FLAG(bitstream, 0, "rbsp_alignment_zero_bit");           
     }
+}
+
+
+static int get_picture_type(SliceType slice_type)
+{
+    // set this value to zero for transmission without signaling
+    // that the whole picture has the same slice type
+    int same_slicetype_for_whole_frame = 5;
+
+    switch (slice_type)
+    {
+        case I_SLICE:
+        {
+            return 2 + same_slicetype_for_whole_frame;
+            break;
+        }
+        case P_SLICE:
+        {
+            return 0 + same_slicetype_for_whole_frame;
+            break;
+        }
+        case B_SLICE:
+        {
+            return 1 + same_slicetype_for_whole_frame;
+            break;
+        }
+        case SP_SLICE:
+        {
+            return 3 + same_slicetype_for_whole_frame;
+            break;
+        }
+        case SI_SLICE:
+        {
+            return 4 + same_slicetype_for_whole_frame;
+            break;
+        }
+        default:
+        {
+            fprintf(stderr, "Picture Type not supported!");
+            break;
+        }
+    }
+
+    return 0;
 }
 
 
@@ -306,5 +349,84 @@ void GenerateSPS
 
     // flush out leftover bits
     write_rbsp_trailing_bits(bitstream);
+}
+
+
+void GenerateSliceHeader
+(
+    OutputBitstream_t &obs,
+    Slice_t &slice,
+    SPS_t &sps,
+    PPS_t &pps,
+    bool IdrPicFlag
+)
+{
+    WRITE_UVLC(obs, slice.first_mb_in_slice, "first_mb_in_slice");
+    WRITE_UVLC(obs, get_picture_type(slice.slice_type), "slice_type");
+    WRITE_UVLC(obs, slice.pic_parameter_set_id, "pic_parameter_set_id");
+
+    if (sps.separate_colour_plane_flag)
+    {
+        WRITE_CODE(obs, slice.colour_plane_id, 2, "colour_plane_id");
+    }
+
+    // write frame_num
+    WRITE_CODE(obs, slice.frame_num, (sps.log2_max_frame_num_minus4 + 4), "frame_num");
+
+    if (!sps.frame_mbs_only_flag)
+    {
+        WRITE_FLAG(obs, slice.field_pic_flag, "field_pic_flag");
+        if (slice.field_pic_flag)
+        {
+            WRITE_FLAG(obs, slice.bottom_field_flag, "bottom_field_flag");
+        }
+    }
+
+    if (IdrPicFlag)
+    {
+        WRITE_UVLC(obs, slice.idr_pic_id, "idr_pic_id");
+    }
+
+    if (sps.pic_order_cnt_type == 0)
+    {
+        WRITE_CODE(obs, slice.pic_order_cnt_lsb, (sps.log2_max_pic_order_cnt_lsb_minus4 + 4), "pic_order_cnt_lsb");
+        if (pps.bottom_field_pic_order_in_frame_present_flag && !slice.field_pic_flag)
+        {
+            WRITE_SVLC(obs, slice.delta_pic_order_cnt_bottom, "delta_pic_order_cnt_bottom");
+        }
+    }
+
+    if (sps.pic_order_cnt_type == 1 && !sps.delta_pic_order_always_zero_flag)
+    {
+        WRITE_SVLC(obs, slice.delta_pic_order_cnt[0], "delta_pic_order_cnt[0]");
+
+        if (pps.bottom_field_pic_order_in_frame_present_flag && !slice.field_pic_flag)
+        {
+            WRITE_SVLC(obs, slice.delta_pic_order_cnt[1], "delta_pic_order_cnt[1]");
+        }
+    }
+
+    if (pps.redundant_pic_cnt_present_flag)
+    {
+        WRITE_UVLC(obs, slice.redundant_pic_cnt, "redundant_pic_cnt");
+    }
+
+    if (slice.slice_type == B_SLICE)
+    {
+        WRITE_FLAG(obs, slice.direct_spatial_mv_pred_flag, "direct_spatial_mv_pred_flag");
+    }
+    if (slice.slice_type == P_SLICE || slice.slice_type == SP_SLICE || slice.slice_type == B_SLICE)
+    {
+        WRITE_FLAG(obs, slice.num_ref_idx_active_override_flag, "num_ref_idx_active_override_flag");
+        if (slice.num_ref_idx_active_override_flag)
+        {
+            WRITE_UVLC(obs, slice.num_ref_idx_l0_active_minus1, "num_ref_idx_l0_active_minus1");
+
+            if (slice.slice_type == B_SLICE)
+            {
+                WRITE_UVLC(obs, slice.num_ref_idx_l1_active_minus1, "num_ref_idx_l1_active_minus1");
+            }
+        }
+    }
 }
 
