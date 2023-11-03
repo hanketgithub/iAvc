@@ -38,6 +38,23 @@ static const uint8_t ZZ_SCAN8[64] =
 };
 
 
+
+
+
+static uint32_t CeilLog2(uint32_t uiVal)
+{
+    unsigned uiTmp = uiVal-1;
+    unsigned uiRet = 0;
+    
+    while (uiTmp != 0)
+    {
+        uiTmp >>= 1;
+        uiRet++;
+    }
+    return uiRet;
+}
+
+
 static
 void scaling_list(OutputBitstream_t &bitstream, int32_t *scalingListinput, int32_t *scalingList, int sizeOfScalingList, bool *UseDefaultScalingMatrix)
 {
@@ -258,6 +275,62 @@ static void write_pred_weight_table(OutputBitstream_t &obs, Slice_t &slice, SPS_
     }
 }
 
+
+static void write_dec_ref_pic_marking(OutputBitstream_t &obs, Slice_t &slice, bool IdrPicFlag)
+{
+    if (IdrPicFlag)
+    {
+        WRITE_FLAG(obs, slice.no_output_of_prior_pics_flag, "no_output_of_prior_pics_flag");
+        WRITE_FLAG(obs, slice.long_term_reference_flag, "long_term_reference_flag");
+    }
+    else
+    {
+        WRITE_FLAG(obs, slice.adaptive_ref_pic_marking_mode_flag, "adaptive_ref_pic_marking_mode_flag");
+
+        if (slice.adaptive_ref_pic_marking_mode_flag)
+        {
+            uint32_t memory_management_control_operation;
+            uint32_t difference_of_pic_nums_minus1;
+            uint32_t long_term_pic_num;
+            uint32_t long_term_frame_idx;
+            uint32_t max_long_term_frame_idx_plus1;
+
+            for (auto op : slice.memory_management_control_ops)
+            {
+                uint32_t memory_management_control_operation = op[0];
+
+                if (memory_management_control_operation == 1 || memory_management_control_operation == 3)
+                {
+                    WRITE_UVLC(obs, memory_management_control_operation, "memory_management_control_operation");
+
+                    uint32_t difference_of_pic_nums_minus1 = op[1];
+                    WRITE_UVLC(obs, difference_of_pic_nums_minus1, "difference_of_pic_nums_minus1");
+                }
+                if (memory_management_control_operation == 2)
+                {
+                    WRITE_UVLC(obs, memory_management_control_operation, "memory_management_control_operation");
+
+                    uint32_t long_term_pic_num = op[1];
+                    WRITE_UVLC(obs, long_term_pic_num, "long_term_pic_num");
+                }
+                if (memory_management_control_operation == 3 || memory_management_control_operation == 6)
+                {
+                    WRITE_UVLC(obs, memory_management_control_operation, "memory_management_control_operation");
+
+                    uint32_t long_term_frame_idx = op[1];
+                    WRITE_UVLC(obs, long_term_frame_idx, "long_term_frame_idx");
+                }
+                if (memory_management_control_operation == 4)
+                {
+                    WRITE_UVLC(obs, memory_management_control_operation, "memory_management_control_operation");
+
+                    uint32_t max_long_term_frame_idx_plus1 = op[1];
+                    WRITE_UVLC(obs, max_long_term_frame_idx_plus1, "max_long_term_frame_idx_plus1");
+                }
+            }
+        }
+    }
+}
 
 static
 void WriteHRDParameters
@@ -485,12 +558,15 @@ void GenerateSliceHeader
     Slice_t &slice,
     SPS_t &sps,
     PPS_t &pps,
-    bool IdrPicFlag
+    bool IdrPicFlag,
+    uint8_t nal_ref_idc
 )
 {
     WRITE_UVLC(obs, slice.first_mb_in_slice, "first_mb_in_slice");
     WRITE_UVLC(obs, get_picture_type(slice.slice_type), "slice_type");
     WRITE_UVLC(obs, slice.pic_parameter_set_id, "pic_parameter_set_id");
+
+    SliceType slice_type = slice.slice_type;
 
     if (sps.separate_colour_plane_flag)
     {
@@ -538,18 +614,18 @@ void GenerateSliceHeader
         WRITE_UVLC(obs, slice.redundant_pic_cnt, "redundant_pic_cnt");
     }
 
-    if (slice.slice_type == B_SLICE)
+    if (slice_type == B_SLICE)
     {
         WRITE_FLAG(obs, slice.direct_spatial_mv_pred_flag, "direct_spatial_mv_pred_flag");
     }
-    if (slice.slice_type == P_SLICE || slice.slice_type == SP_SLICE || slice.slice_type == B_SLICE)
+    if (slice_type == P_SLICE || slice_type == SP_SLICE || slice_type == B_SLICE)
     {
         WRITE_FLAG(obs, slice.num_ref_idx_active_override_flag, "num_ref_idx_active_override_flag");
         if (slice.num_ref_idx_active_override_flag)
         {
             WRITE_UVLC(obs, slice.num_ref_idx_l0_active_minus1, "num_ref_idx_l0_active_minus1");
 
-            if (slice.slice_type == B_SLICE)
+            if (slice_type == B_SLICE)
             {
                 WRITE_UVLC(obs, slice.num_ref_idx_l1_active_minus1, "num_ref_idx_l1_active_minus1");
             }
@@ -557,5 +633,59 @@ void GenerateSliceHeader
     }
 
     write_ref_pic_list_modification(obs, slice);
+
+    if ( (pps.weighted_pred_flag && (slice_type == P_SLICE || slice_type == SP_SLICE))
+      || (pps.weighted_bipred_idc == 1 && slice_type == B_SLICE) )
+    {
+        write_pred_weight_table(obs, slice, sps);
+    }
+
+    if (nal_ref_idc != 0)
+    {
+        write_dec_ref_pic_marking(obs, slice, IdrPicFlag);
+    }
+
+    if (pps.entropy_coding_mode_flag && slice_type != I_SLICE && slice_type != SI_SLICE)
+    {
+        WRITE_UVLC(obs, slice.cabac_init_idc, "cabac_init_idc");
+    }
+
+    WRITE_SVLC(obs, slice.slice_qp_delta, "slice_qp_delta");
+
+    if (slice_type == SP_SLICE || slice_type == SI_SLICE)
+    {
+        if (slice_type == SP_SLICE)
+        {
+            WRITE_FLAG(obs, slice.sp_for_switch_flag, "sp_for_switch_flag");
+        }
+
+        WRITE_SVLC(obs, slice.slice_qs_delta, "slice_qs_delta");
+    }
+
+    if (pps.deblocking_filter_control_present_flag)
+    {
+        WRITE_UVLC(obs, slice.disable_deblocking_filter_idc, "disable_deblocking_filter_idc");
+        if (slice.disable_deblocking_filter_idc != 1)
+        {
+            WRITE_SVLC(obs, slice.slice_alpha_c0_offset_div2, "slice_alpha_c0_offset_div2");
+            WRITE_SVLC(obs, slice.slice_beta_offset_div2, "slice_beta_offset_div2");
+        }
+    }
+
+    if (pps.num_slice_groups_minus1 > 0 && pps.slice_group_map_type >=3 && pps.slice_group_map_type <= 5)
+    {
+        int len = (sps.pic_height_in_map_units_minus1 + 1 ) * (sps.pic_width_in_mbs_minus1 + 1) / (pps.slice_group_change_rate_minus1 + 1);
+
+        if (((sps.pic_height_in_map_units_minus1 + 1) * (sps.pic_width_in_mbs_minus1 + 1)) % (pps.slice_group_change_rate_minus1 + 1))
+        {
+            len += 1;
+        }
+
+        len = CeilLog2(len + 1);
+
+        WRITE_CODE(obs, slice.slice_group_change_cycle, len, "slice_group_change_cycle");
+    }
+
+    
 }
 

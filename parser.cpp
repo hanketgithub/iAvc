@@ -335,6 +335,7 @@ static void ref_pic_list_modification(InputBitstream_t &ibs, Slice_t &slice)
 }
 
 
+// 7.3.3.2 Prediction weight table syntax
 static void pred_weight_table(InputBitstream_t &bitstream, Slice_t &slice, SPS_t &sps)
 {
     slice.luma_log2_weight_denom = READ_UVLC(bitstream, "luma_log2_weight_denom");
@@ -395,6 +396,7 @@ static void pred_weight_table(InputBitstream_t &bitstream, Slice_t &slice, SPS_t
 }
 
 
+// 7.3.3.3 Decoded reference picture marking syntax
 static void dec_ref_pic_marking(InputBitstream_t &bitstream, Slice_t &slice, bool IdrPicFlag)
 {
     if (IdrPicFlag)
@@ -409,24 +411,33 @@ static void dec_ref_pic_marking(InputBitstream_t &bitstream, Slice_t &slice, boo
         if (slice.adaptive_ref_pic_marking_mode_flag)
         {
             uint32_t memory_management_control_operation;
+            uint32_t difference_of_pic_nums_minus1;
+            uint32_t long_term_pic_num;
+            uint32_t long_term_frame_idx;
+            uint32_t max_long_term_frame_idx_plus1;
+
             do
             {
                 memory_management_control_operation = READ_UVLC(bitstream, "memory_management_control_operation");
                 if (memory_management_control_operation == 1 || memory_management_control_operation == 3)
                 {
-                    slice.difference_of_pic_nums_minus1 = READ_UVLC(bitstream, "difference_of_pic_nums_minus1");
+                    difference_of_pic_nums_minus1 = READ_UVLC(bitstream, "difference_of_pic_nums_minus1");
+                    slice.memory_management_control_ops.push_back( { memory_management_control_operation, difference_of_pic_nums_minus1 } );
                 }
                 if (memory_management_control_operation == 2)
                 {
-                    slice.long_term_pic_num = READ_UVLC(bitstream, "long_term_pic_num");
+                    long_term_pic_num = READ_UVLC(bitstream, "long_term_pic_num");
+                    slice.memory_management_control_ops.push_back( { memory_management_control_operation, long_term_pic_num } );
                 }
                 if (memory_management_control_operation == 3 || memory_management_control_operation == 6)
                 {
-                    slice.long_term_frame_idx = READ_UVLC(bitstream, "long_term_frame_idx");
+                    long_term_frame_idx = READ_UVLC(bitstream, "long_term_frame_idx");
+                    slice.memory_management_control_ops.push_back( { memory_management_control_operation, long_term_frame_idx } );
                 }
                 if (memory_management_control_operation == 4)
                 {
-                    slice.max_long_term_frame_idx_plus1 = READ_UVLC(bitstream, "max_long_term_frame_idx_plus1");
+                    max_long_term_frame_idx_plus1 = READ_UVLC(bitstream, "max_long_term_frame_idx_plus1");
+                    slice.memory_management_control_ops.push_back( { memory_management_control_operation, max_long_term_frame_idx_plus1 } );
                 }
             } while (memory_management_control_operation != 0);
         }

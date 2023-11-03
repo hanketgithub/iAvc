@@ -23,6 +23,7 @@
 #define MAXnum_ref_frames_in_pic_order_cnt_cycle    256
 #define MAXnum_slice_groups_minus1                  8
 #define MAXIMUMVALUEOFcpb_cnt                       32
+#define MAX_REFERENCE_PICTURES                      32
 
 
 typedef enum
@@ -297,7 +298,6 @@ typedef struct
     bool   vui_pic_parameters_flag;                             // u(1)
 } PPS_t;
 
-#define MAX_REFERENCE_PICTURES  32
 
 typedef struct
 {
@@ -348,10 +348,10 @@ typedef struct
     bool        no_output_of_prior_pics_flag;
     bool        long_term_reference_flag;
     bool        adaptive_ref_pic_marking_mode_flag;
-    uint32_t    difference_of_pic_nums_minus1;
-    uint32_t    long_term_pic_num;
-    uint32_t    long_term_frame_idx;
-    uint32_t    max_long_term_frame_idx_plus1;
+    /*
+     * list of { memory_management_control_operation, difference_of_pic_nums_minus1 / long_term_pic_num / long_term_frame_idx / max_long_term_frame_idx_plus1 }
+     */
+    std::vector< std::vector<uint32_t> > memory_management_control_ops;
 
     uint32_t    cabac_init_idc;
 
