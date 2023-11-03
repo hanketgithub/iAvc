@@ -18,6 +18,7 @@
 
 #include <algorithm>
 #include <string>
+#include <vector>
 
 
 #include "common.h"
@@ -296,10 +297,12 @@ static void ref_pic_list_modification(InputBitstream_t &ibs, Slice_t &slice)
                 if (modification_of_pic_nums_idc == 0 || modification_of_pic_nums_idc == 1)
                 {
                     abs_diff_pic_num_minus1 = READ_UVLC(ibs, "abs_diff_pic_num_minus1");
+                    slice.ref_pic_list_modification_q0.push_back( { modification_of_pic_nums_idc, abs_diff_pic_num_minus1 } );
                 }
                 else if (modification_of_pic_nums_idc == 2)
                 {
                     long_term_pic_num = READ_UVLC(ibs, "long_term_pic_num");
+                    slice.ref_pic_list_modification_q0.push_back( { modification_of_pic_nums_idc, long_term_pic_num } );
                 }
             } while (modification_of_pic_nums_idc != 3);
         }
@@ -316,23 +319,23 @@ static void ref_pic_list_modification(InputBitstream_t &ibs, Slice_t &slice)
                 if (modification_of_pic_nums_idc == 0 || modification_of_pic_nums_idc == 1)
                 {
                     abs_diff_pic_num_minus1 = READ_UVLC(ibs, "abs_diff_pic_num_minus1");
+                    slice.ref_pic_list_modification_q1.push_back( { modification_of_pic_nums_idc, abs_diff_pic_num_minus1 } );
                 }
                 else if (modification_of_pic_nums_idc == 2)
                 {
                     long_term_pic_num = READ_UVLC(ibs, "long_term_pic_num");
+                    slice.ref_pic_list_modification_q1.push_back( { modification_of_pic_nums_idc, long_term_pic_num } );
                 }
             } while (modification_of_pic_nums_idc != 3);
         }
     }
 
-    slice.ref_pic_list_modification_flag_l0 = ref_pic_list_modification_flag_l0;
-
-    
-    slice.ref_pic_list_modification_flag_l1 = ref_pic_list_modification_flag_l1;
+    slice.ref_pic_list_modification_flag_l0     = ref_pic_list_modification_flag_l0;
+    slice.ref_pic_list_modification_flag_l1     = ref_pic_list_modification_flag_l1;
 }
 
 
-static void pred_weight_table(InputBitstream_t &bitstream, Slice_t &slice, SPS_t &sps, SliceType slice_type)
+static void pred_weight_table(InputBitstream_t &bitstream, Slice_t &slice, SPS_t &sps)
 {
     slice.luma_log2_weight_denom = READ_UVLC(bitstream, "luma_log2_weight_denom");
 
@@ -346,8 +349,8 @@ static void pred_weight_table(InputBitstream_t &bitstream, Slice_t &slice, SPS_t
         slice.luma_weight_l0_flag = READ_FLAG(bitstream, "luma_weight_l0_flag");
         if (slice.luma_weight_l0_flag)
         {
-            slice.luma_weight_l0[LIST_0][i] = READ_SVLC(bitstream, "luma_weight_l0");
-            slice.luma_offset_l0[LIST_0][i] = READ_SVLC(bitstream, "luma_offset_l0");
+            slice.luma_weight_l0[i] = READ_SVLC(bitstream, "luma_weight_l0");
+            slice.luma_offset_l0[i] = READ_SVLC(bitstream, "luma_offset_l0");
         }
 
         if (sps.chroma_format_idc != 0)
@@ -357,22 +360,22 @@ static void pred_weight_table(InputBitstream_t &bitstream, Slice_t &slice, SPS_t
             {
                 for (int j = 0; j < 2; j++)
                 {
-                    slice.chroma_weight_l0[LIST_0][i][j] = READ_SVLC(bitstream, "chroma_weight_l0");
-                    slice.chroma_offset_l0[LIST_0][i][j] = READ_SVLC(bitstream, "chroma_offset_l0");
+                    slice.chroma_weight_l0[i][j] = READ_SVLC(bitstream, "chroma_weight_l0");
+                    slice.chroma_offset_l0[i][j] = READ_SVLC(bitstream, "chroma_offset_l0");
                 }
             }
         }
     }
 
-    if (slice_type % 5 == 1)
+    if (slice.slice_type == B_SLICE)
     {
         for (uint32_t i = 0; i <= slice.num_ref_idx_l1_active_minus1; i++)
         {
             slice.luma_weight_l1_flag = READ_FLAG(bitstream, "luma_weight_l1_flag");
             if (slice.luma_weight_l1_flag)
             {
-                slice.luma_weight_l1[LIST_0][i] = READ_SVLC(bitstream, "luma_weight_l1");
-                slice.luma_offset_l1[LIST_0][i] = READ_SVLC(bitstream, "luma_offset_l1");
+                slice.luma_weight_l1[i] = READ_SVLC(bitstream, "luma_weight_l1");
+                slice.luma_offset_l1[i] = READ_SVLC(bitstream, "luma_offset_l1");
             }
 
             if (sps.chroma_format_idc != 0)
@@ -382,8 +385,8 @@ static void pred_weight_table(InputBitstream_t &bitstream, Slice_t &slice, SPS_t
                 {
                     for (int j = 0; j < 2; j++)
                     {
-                        slice.chroma_weight_l1[LIST_0][i][j] = READ_SVLC(bitstream, "chroma_weight_l1");
-                        slice.chroma_offset_l1[LIST_0][i][j] = READ_SVLC(bitstream, "chroma_offset_l1");
+                        slice.chroma_weight_l1[i][j] = READ_SVLC(bitstream, "chroma_weight_l1");
+                        slice.chroma_offset_l1[i][j] = READ_SVLC(bitstream, "chroma_offset_l1");
                     }
                 }
             }
@@ -411,7 +414,7 @@ static void dec_ref_pic_marking(InputBitstream_t &bitstream, Slice_t &slice, boo
                 memory_management_control_operation = READ_UVLC(bitstream, "memory_management_control_operation");
                 if (memory_management_control_operation == 1 || memory_management_control_operation == 3)
                 {
-                    slice.difference_of_pic_nums_minus1 = READ_UVLC(bitstream, "");
+                    slice.difference_of_pic_nums_minus1 = READ_UVLC(bitstream, "difference_of_pic_nums_minus1");
                 }
                 if (memory_management_control_operation == 2)
                 {
@@ -903,7 +906,7 @@ void ParseSliceHeader
     if ( (pps.weighted_pred_flag && (slice_type == P_SLICE || slice_type == SP_SLICE))
       || (pps.weighted_bipred_idc == 1 && slice_type == B_SLICE) )
     {
-        pred_weight_table(bitstream, slice, sps, slice_type);
+        pred_weight_table(bitstream, slice, sps);
     }
 
     if (nal_ref_idc != 0)
@@ -963,7 +966,6 @@ void ParseSliceHeader
     slice.pic_order_cnt_lsb     = pic_order_cnt_lsb;
     slice.delta_pic_order_cnt_bottom = delta_pic_order_cnt_bottom;
     slice.delta_pic_order_cnt[0] = delta_pic_order_cnt[0];
-
 
     slice.redundant_pic_cnt = redundant_pic_cnt;
 

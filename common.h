@@ -321,27 +321,29 @@ typedef struct
     uint32_t    num_ref_idx_l0_active_minus1;
     uint32_t    num_ref_idx_l1_active_minus1;
 
-    bool        ref_pic_list_modification_flag_l0;
+    bool        ref_pic_list_modification_flag_l0;  
     bool        ref_pic_list_modification_flag_l1;
-
+    std::vector< std::vector<uint32_t> > ref_pic_list_modification_q0;   // list0 of { modification_of_pic_num_idc, abs_diff_pic_num_minus1 / long_term_pic_num }
+    std::vector< std::vector<uint32_t> > ref_pic_list_modification_q1;   // list1 of { modification_of_pic_num_idc, abs_diff_pic_num_minus1 / long_term_pic_num }
+    
     uint32_t    luma_log2_weight_denom;
     uint32_t    chroma_log2_weight_denom;
 
     bool        luma_weight_l0_flag;
-    int32_t     luma_weight_l0[2][MAX_REFERENCE_PICTURES];
-    int32_t     luma_offset_l0[6][MAX_REFERENCE_PICTURES];
+    int32_t     luma_weight_l0[MAX_REFERENCE_PICTURES];
+    int32_t     luma_offset_l0[MAX_REFERENCE_PICTURES];
 
     bool        chroma_weight_l0_flag;
-    int32_t     chroma_weight_l0[2][MAX_REFERENCE_PICTURES][2];
-    int32_t     chroma_offset_l0[6][MAX_REFERENCE_PICTURES][2];
+    int32_t     chroma_weight_l0[MAX_REFERENCE_PICTURES][2];
+    int32_t     chroma_offset_l0[MAX_REFERENCE_PICTURES][2];
 
     bool        luma_weight_l1_flag;
-    int32_t     luma_weight_l1[2][MAX_REFERENCE_PICTURES];
-    int32_t     luma_offset_l1[6][MAX_REFERENCE_PICTURES];
+    int32_t     luma_weight_l1[MAX_REFERENCE_PICTURES];
+    int32_t     luma_offset_l1[MAX_REFERENCE_PICTURES];
 
     bool        chroma_weight_l1_flag;
-    int32_t     chroma_weight_l1[2][MAX_REFERENCE_PICTURES][2];
-    int32_t     chroma_offset_l1[6][MAX_REFERENCE_PICTURES][2];
+    int32_t     chroma_weight_l1[MAX_REFERENCE_PICTURES][2];
+    int32_t     chroma_offset_l1[MAX_REFERENCE_PICTURES][2];
 
     bool        no_output_of_prior_pics_flag;
     bool        long_term_reference_flag;

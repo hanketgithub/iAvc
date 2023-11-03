@@ -132,6 +132,133 @@ static int get_picture_type(SliceType slice_type)
 }
 
 
+/*!
+ ********************************************************************************************
+ * \brief
+ *    writes the ref_pic_list_reordering syntax
+ ********************************************************************************************
+*/
+static void write_ref_pic_list_modification(OutputBitstream_t &obs, Slice_t &slice)
+{
+    SliceType slice_type = slice.slice_type;
+
+    if (slice_type != I_SLICE && slice_type != SI_SLICE)
+    {
+        WRITE_FLAG(obs, slice.ref_pic_list_modification_flag_l0, "ref_pic_list_modification_flag_l0");
+        if (slice.ref_pic_list_modification_flag_l0)
+        {
+            for (auto v : slice.ref_pic_list_modification_q0)
+            {
+                uint32_t modification_of_pic_nums_idc = v[0];
+                WRITE_UVLC(obs, v[0], "modification_of_pic_nums_idc");
+
+                if (modification_of_pic_nums_idc == 0 || modification_of_pic_nums_idc == 1)
+                {
+                    uint32_t abs_diff_pic_num_minus1 = v[1];
+                    WRITE_UVLC(obs, abs_diff_pic_num_minus1, "abs_diff_pic_num_minus1");
+                }
+                else if (modification_of_pic_nums_idc == 2)
+                {
+                    uint32_t long_term_pic_num = v[1];
+                    WRITE_UVLC(obs, long_term_pic_num, "long_term_pic_num");
+                }
+            }
+        }
+    }
+
+    if (slice_type == B_SLICE)
+    {
+        WRITE_FLAG(obs, slice.ref_pic_list_modification_flag_l1, "ref_pic_list_modification_flag_l1");
+        if (slice.ref_pic_list_modification_flag_l1)
+        {
+            for (auto v : slice.ref_pic_list_modification_q1)
+            {
+                uint32_t modification_of_pic_nums_idc = v[0];
+                WRITE_UVLC(obs, v[0], "modification_of_pic_nums_idc");
+
+                if (modification_of_pic_nums_idc == 0 || modification_of_pic_nums_idc == 1)
+                {
+                    uint32_t abs_diff_pic_num_minus1 = v[1];
+                    WRITE_UVLC(obs, abs_diff_pic_num_minus1, "abs_diff_pic_num_minus1");
+                }
+                else if (modification_of_pic_nums_idc == 2)
+                {
+                    uint32_t long_term_pic_num = v[1];
+                    WRITE_UVLC(obs, long_term_pic_num, "long_term_pic_num");
+                }
+            }
+        }
+    }
+}
+
+
+
+/*!
+ ********************************************************************************************
+ * \brief
+ *    writes the pred_weight_table syntax
+ ********************************************************************************************
+*/
+static void write_pred_weight_table(OutputBitstream_t &obs, Slice_t &slice, SPS_t &sps)
+{
+    WRITE_UVLC(obs, slice.luma_log2_weight_denom, "luma_log2_weight_denom");
+
+    if (sps.chroma_format_idc != 0)
+    {
+        WRITE_UVLC(obs, slice.chroma_log2_weight_denom, "chroma_log2_weight_denom");
+    }
+
+    for (uint32_t i = 0; i <= slice.num_ref_idx_l0_active_minus1; i++)
+    {
+        WRITE_FLAG(obs, slice.luma_weight_l0_flag, "luma_weight_l0_flag");
+        if (slice.luma_weight_l0_flag)
+        {
+            WRITE_SVLC(obs, slice.luma_weight_l0[i], "luma_weight_l0");
+            WRITE_SVLC(obs, slice.luma_offset_l0[i], "luma_offset_l0");
+        }
+
+        if (sps.chroma_format_idc != 0)
+        {
+            WRITE_FLAG(obs, slice.chroma_weight_l0_flag, "chroma_weight_l0_flag");
+            if (slice.chroma_weight_l0_flag)
+            {
+                for (int j = 0; j < 2; j++)
+                {
+                    WRITE_SVLC(obs, slice.chroma_weight_l0[i][j], "chroma_weight_l0");
+                    WRITE_SVLC(obs, slice.chroma_offset_l0[i][j], "chroma_offset_l0");
+                }
+            }
+        }
+    }
+
+    if (slice.slice_type == B_SLICE)
+    {
+        for (uint32_t i = 0; i <= slice.num_ref_idx_l1_active_minus1; i++)
+        {
+            WRITE_FLAG(obs, slice.luma_weight_l1_flag, "luma_weight_l1_flag");
+            if (slice.luma_weight_l1_flag)
+            {
+                WRITE_SVLC(obs, slice.luma_weight_l1[i], "luma_weight_l1");
+                WRITE_SVLC(obs, slice.luma_offset_l1[i], "luma_offset_l1");
+            }
+
+            if (sps.chroma_format_idc != 0)
+            {
+                WRITE_FLAG(obs, slice.chroma_weight_l0_flag, "chroma_weight_l1_flag");
+                if (slice.chroma_weight_l0_flag)
+                {
+                    for (int j = 0; j < 2; j++)
+                    {
+                        WRITE_SVLC(obs, slice.chroma_weight_l0[i][j], "chroma_weight_l1");
+                        WRITE_SVLC(obs, slice.chroma_offset_l0[i][j], "chroma_offset_l1");
+                    }
+                }
+            }
+        }
+    }
+}
+
+
 static
 void WriteHRDParameters
 (
@@ -428,5 +555,7 @@ void GenerateSliceHeader
             }
         }
     }
+
+    write_ref_pic_list_modification(obs, slice);
 }
 
