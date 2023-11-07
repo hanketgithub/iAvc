@@ -582,8 +582,6 @@ static int ParseSliceHeader
         pred_weight_table(bitstream, slice, sps);
     }
 
-    printf("nal_ref_idc=%d\n", nal_ref_idc);
-
     if (nal_ref_idc != 0)
     {
         dec_ref_pic_marking(bitstream, slice, IdrPicFlag);
@@ -1041,6 +1039,8 @@ int ParseSlice
 )
 {
     int ret = 0;
+
+    printf("%s---------\n", __FUNCTION__);
 
     ret = ParseSliceHeader(ibs, slice, SPSs, PPSs, IdrPicFlag, nal_ref_idc, message);
 

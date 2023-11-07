@@ -710,6 +710,8 @@ void GenerateSlice
     uint8_t nal_ref_idc
 )
 {
+    printf("%s---------\n", __FUNCTION__);
+
     GenerateSliceHeader(obs, slice, sps, pps, IdrPicFlag, nal_ref_idc);
 
     printf("%s: held bits=%d\n", __FUNCTION__, obs.m_num_held_bits);

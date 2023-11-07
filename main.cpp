@@ -340,7 +340,7 @@ int main(int argc, char *argv[])
         if (nalFound)
         {
             nal_unit_type           = (NaluType) ((nal_unit_header[0] & (BIT4 | BIT3 | BIT2 | BIT1 | BIT0)));
-            nal_ref_idc             = (nal_unit_header[0] & (BIT5 | BIT6) >> 5);
+            nal_ref_idc             = ((nal_unit_header[0] & (BIT5 | BIT6)) >> 5);
             forbidden_zero_bit      = (nal_unit_header[0] & BIT7) >> 7;
 
             if (!forbidden_zero_bit)
