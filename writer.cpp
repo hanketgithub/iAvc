@@ -685,7 +685,5 @@ void GenerateSliceHeader
 
         WRITE_CODE(obs, slice.slice_group_change_cycle, len, "slice_group_change_cycle");
     }
-
-    
 }
 

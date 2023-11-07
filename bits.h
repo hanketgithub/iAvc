@@ -29,7 +29,6 @@ typedef struct
     uint8_t  m_held_bits;
 
     std::vector<uint8_t> m_fifo;
-    uint32_t m_fifo_idx;
 } OutputBitstream_t;
 
 

@@ -8,7 +8,7 @@ extern void ParseSPS(InputBitstream_t &bitstream, SPS_t SPSs[], AvcInfo_t &pAvcI
 
 extern void ParsePPS(InputBitstream_t &bitstream, PPS_t PPSs[], SPS_t SPSs[]);
 
-extern void ParseSliceHeader
+extern int ParseSliceHeader
 (
     InputBitstream_t &bitstream,
     Slice_t &slice,

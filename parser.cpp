@@ -286,7 +286,7 @@ static void ref_pic_list_modification(InputBitstream_t &ibs, Slice_t &slice)
     uint32_t long_term_pic_num;
     SliceType slice_type = slice.slice_type;
 
-    if (slice_type % 5 != 2 && slice_type % 5 != 4)
+    if (slice_type != I_SLICE && slice_type != SI_SLICE)
     {
         ref_pic_list_modification_flag_l0 = READ_FLAG(ibs, "ref_pic_list_modification_flag_l0");
         if (ref_pic_list_modification_flag_l0)
@@ -308,7 +308,7 @@ static void ref_pic_list_modification(InputBitstream_t &ibs, Slice_t &slice)
         }
     }
 
-    if (slice_type % 5 == 1)
+    if (slice_type == B_SLICE)
     {
         ref_pic_list_modification_flag_l1 = READ_FLAG(ibs, "ref_pic_list_modification_flag_l1");
         if (ref_pic_list_modification_flag_l1)
@@ -796,7 +796,7 @@ void ParsePPS(InputBitstream_t &bitstream, PPS_t PPSs[], SPS_t SPSs[])
 
 
 // 7.3.3 Slice header syntax
-void ParseSliceHeader
+int ParseSliceHeader
 (
     InputBitstream_t &bitstream,
     Slice_t &slice,
@@ -834,16 +834,19 @@ void ParseSliceHeader
     int32_t slice_beta_offset_div2 = 0;
     uint32_t slice_group_change_cycle = 0;
 
+    int ret = 0;
+
     first_mb_in_slice       = READ_UVLC(bitstream, "first_mb_in_slice");
     tmp                     = READ_UVLC(bitstream, "slice_type");
     pic_parameter_set_id    = READ_UVLC(bitstream, "pic_parameter_set_id");
 
     slice_type = (SliceType) (tmp % 5);
+    slice.slice_type = slice_type;
 
     if (!PPSs[pic_parameter_set_id].isValid)
     {
         printf("PPS %d is not activated!\n", pic_parameter_set_id);
-        return;
+        return -1;
     }
 
     PPS_t &pps = PPSs[ pic_parameter_set_id ];
@@ -995,5 +998,7 @@ void ParseSliceHeader
     slice.slice_alpha_c0_offset_div2    = slice_alpha_c0_offset_div2;
     slice.slice_beta_offset_div2        = slice_beta_offset_div2;
     slice.slice_group_change_cycle      = slice_group_change_cycle;
+
+    return ret;
 }
 

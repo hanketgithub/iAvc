@@ -49,7 +49,7 @@ static SPS_t SPSs[32];
 
 static PPS_t PPSs[128];
 
-static Slice_t curSlice;
+static Slice_t slice;
 
 string message;
 
@@ -377,7 +377,6 @@ int main(int argc, char *argv[])
 
                             obs.m_num_held_bits = 0;
                             obs.m_held_bits     = 0;
-                            obs.m_fifo_idx      = 0;
 
                             printf("obs size=%lu\n", obs.m_fifo.size());
 
@@ -443,9 +442,53 @@ int main(int argc, char *argv[])
                     case NALU_TYPE_SLICE:
                     {
                         bool IdrPicFlag = ( ( nal_unit_type == 5 ) ? 1 : 0 );
-                    
-                        ParseSliceHeader(ibs, curSlice, SPSs, PPSs, IdrPicFlag, nal_ref_idc, message);
 
+                        if (ParseSliceHeader(ibs, slice, SPSs, PPSs, IdrPicFlag, nal_ref_idc, message) < 0)
+                        {
+                        }
+                        else
+                        {
+                            OutputBitstream_t obs;
+
+                            obs.m_num_held_bits = 0;
+                            obs.m_held_bits     = 0;
+
+                            GenerateSliceHeader(obs, slice, SPSs[ PPSs[slice.pic_parameter_set_id].seq_parameter_set_id ], PPSs[slice.pic_parameter_set_id], IdrPicFlag, nal_ref_idc);
+
+                            cout << "chk slice output" << endl;
+                            for (int i = 0; i < obs.m_fifo.size(); i++)
+                            {
+                                printf("0x%02x ", obs.m_fifo[i]);
+                            }
+                            printf("\n");
+
+                            if (1)
+                            {
+                                InputBitstream_t ibs1 = {0};
+
+                                ibs1.m_fifo_size    = obs.m_fifo.size();
+                                ibs1.m_fifo         = (uint8_t *) calloc(1, ibs1.m_fifo_size);
+
+                                for (int i = 0; i < obs.m_fifo.size(); i++)
+                                {
+                                    ibs1.m_fifo[i] = obs.m_fifo[i];
+                                }
+
+                                for (int i = 0; i < obs.m_fifo.size(); i++)
+                                {
+                                    printf("0x%02x ", ibs1.m_fifo[i]);
+                                }
+
+                                printf("Reparse slice!\n");
+
+                                Slice_t testSlice = {0};
+                                ParseSliceHeader(ibs1, testSlice, SPSs, PPSs, IdrPicFlag, nal_ref_idc, message);
+                            }
+
+                            
+                            exit(0);
+                        }
+                        
                         break;
                     }
                     case NALU_TYPE_SEI:
