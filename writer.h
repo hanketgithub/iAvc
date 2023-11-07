@@ -6,7 +6,7 @@
 
 extern void GenerateSPS(OutputBitstream_t &bitstream, SPS_t &sps);
 
-extern void GenerateSliceHeader
+extern void GenerateSlice
 (
     OutputBitstream_t &obs,
     Slice_t &slice,

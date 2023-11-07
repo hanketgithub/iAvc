@@ -441,9 +441,11 @@ int main(int argc, char *argv[])
                     case NALU_TYPE_IDR:
                     case NALU_TYPE_SLICE:
                     {
+                        static int cnt = 0;
+                        
                         bool IdrPicFlag = ( ( nal_unit_type == 5 ) ? 1 : 0 );
 
-                        if (ParseSliceHeader(ibs, slice, SPSs, PPSs, IdrPicFlag, nal_ref_idc, message) < 0)
+                        if (ParseSlice(ibs, slice, SPSs, PPSs, IdrPicFlag, nal_ref_idc, message) < 0)
                         {
                         }
                         else
@@ -453,7 +455,7 @@ int main(int argc, char *argv[])
                             obs.m_num_held_bits = 0;
                             obs.m_held_bits     = 0;
 
-                            GenerateSliceHeader(obs, slice, SPSs[ PPSs[slice.pic_parameter_set_id].seq_parameter_set_id ], PPSs[slice.pic_parameter_set_id], IdrPicFlag, nal_ref_idc);
+                            GenerateSlice(obs, slice, SPSs[ PPSs[slice.pic_parameter_set_id].seq_parameter_set_id ], PPSs[slice.pic_parameter_set_id], IdrPicFlag, nal_ref_idc);
 
                             cout << "chk slice output" << endl;
                             for (int i = 0; i < obs.m_fifo.size(); i++)
@@ -482,11 +484,14 @@ int main(int argc, char *argv[])
                                 printf("Reparse slice!\n");
 
                                 Slice_t testSlice = {0};
-                                ParseSliceHeader(ibs1, testSlice, SPSs, PPSs, IdrPicFlag, nal_ref_idc, message);
+                                ParseSlice(ibs1, testSlice, SPSs, PPSs, IdrPicFlag, nal_ref_idc, message);
+                                cnt++;
+
+                                if (cnt > 4) { exit(0); }
                             }
 
                             
-                            exit(0);
+                            //exit(0);
                         }
                         
                         break;

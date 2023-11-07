@@ -552,7 +552,7 @@ void GenerateSPS
 }
 
 
-void GenerateSliceHeader
+static void GenerateSliceHeader
 (
     OutputBitstream_t &obs,
     Slice_t &slice,
@@ -685,5 +685,35 @@ void GenerateSliceHeader
 
         WRITE_CODE(obs, slice.slice_group_change_cycle, len, "slice_group_change_cycle");
     }
+}
+
+
+static void GenerateSliceData(OutputBitstream_t &obs, PPS_t &pps)
+{
+    if (pps.entropy_coding_mode_flag)
+    {
+        while (obs.m_num_held_bits > 0)
+        {
+            WRITE_CODE(obs, 1, 1, "cabac_alignment_one_bit");
+        }
+    }
+}
+
+
+void GenerateSlice
+(
+    OutputBitstream_t &obs,
+    Slice_t &slice,
+    SPS_t &sps,
+    PPS_t &pps,
+    bool IdrPicFlag,
+    uint8_t nal_ref_idc
+)
+{
+    GenerateSliceHeader(obs, slice, sps, pps, IdrPicFlag, nal_ref_idc);
+
+    printf("%s: held bits=%d\n", __FUNCTION__, obs.m_num_held_bits);
+
+    GenerateSliceData(obs, pps);
 }
 

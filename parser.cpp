@@ -28,6 +28,11 @@
 using namespace std;
 
 
+static uint32_t CeilLog2(uint32_t uiVal);
+static void ParseSliceData(InputBitstream_t &ibs);
+
+
+
 
 static uint32_t CeilLog2(uint32_t uiVal)
 {
@@ -304,6 +309,10 @@ static void ref_pic_list_modification(InputBitstream_t &ibs, Slice_t &slice)
                     long_term_pic_num = READ_UVLC(ibs, "long_term_pic_num");
                     slice.ref_pic_list_modification_q0.push_back( { modification_of_pic_nums_idc, long_term_pic_num } );
                 }
+                else if (modification_of_pic_nums_idc == 3)
+                {
+                    slice.ref_pic_list_modification_q0.push_back( { modification_of_pic_nums_idc, 0 } );
+                }
             } while (modification_of_pic_nums_idc != 3);
         }
     }
@@ -440,6 +449,231 @@ static void dec_ref_pic_marking(InputBitstream_t &bitstream, Slice_t &slice, boo
                     slice.memory_management_control_ops.push_back( { memory_management_control_operation, max_long_term_frame_idx_plus1 } );
                 }
             } while (memory_management_control_operation != 0);
+        }
+    }
+}
+
+
+// 7.3.3 Slice header syntax
+static int ParseSliceHeader
+(
+    InputBitstream_t &bitstream,
+    Slice_t &slice,
+    SPS_t SPSs[],
+    PPS_t PPSs[],
+    bool IdrPicFlag,
+    uint8_t nal_ref_idc,
+    string &message
+)
+{
+    uint32_t first_mb_in_slice  = 0;
+    uint32_t tmp                = 0;
+    SliceType slice_type        = P_SLICE;
+
+    uint32_t pic_parameter_set_id   = 0;
+    uint8_t colour_plane_id         = 0;
+    uint16_t frame_num              = 0;
+    bool field_pic_flag             = false;
+    bool bottom_field_flag          = false;
+    uint32_t idr_pic_id             = 0;
+    uint32_t pic_order_cnt_lsb      = 0;
+    int32_t delta_pic_order_cnt_bottom = 0;
+    int32_t delta_pic_order_cnt[2] = {0};
+    uint32_t redundant_pic_cnt = 0;
+    bool direct_spatial_mv_pred_flag = false;
+    bool num_ref_idx_active_override_flag = false;
+    uint32_t num_ref_idx_l0_active_minus1 = 0;
+    uint32_t num_ref_idx_l1_active_minus1 = 0;
+    uint32_t cabac_init_idc = 0;
+    int32_t slice_qp_delta = 0;
+    bool sp_for_switch_flag = false;
+    int32_t slice_qs_delta = 0;
+    uint32_t disable_deblocking_filter_idc = 0;
+    int32_t slice_alpha_c0_offset_div2 = 0;
+    int32_t slice_beta_offset_div2 = 0;
+    uint32_t slice_group_change_cycle = 0;
+
+    int ret = 0;
+
+    first_mb_in_slice       = READ_UVLC(bitstream, "first_mb_in_slice");
+    tmp                     = READ_UVLC(bitstream, "slice_type");
+    pic_parameter_set_id    = READ_UVLC(bitstream, "pic_parameter_set_id");
+
+    slice_type = (SliceType) (tmp % 5);
+    slice.slice_type = slice_type;
+
+    if (!PPSs[pic_parameter_set_id].isValid)
+    {
+        printf("PPS %d is not activated!\n", pic_parameter_set_id);
+        return -1;
+    }
+
+    PPS_t &pps = PPSs[ pic_parameter_set_id ];
+    SPS_t &sps = SPSs[ pps.seq_parameter_set_id ];
+
+    if (sps.separate_colour_plane_flag)
+    {
+        colour_plane_id = READ_CODE(bitstream, 2, "colour_plane_id");
+    }
+
+    frame_num = READ_CODE(bitstream, (sps.log2_max_frame_num_minus4 + 4), "frame_num");
+
+    if (!sps.frame_mbs_only_flag)
+    {
+        field_pic_flag = READ_FLAG(bitstream, "field_pic_flag");
+
+        if (field_pic_flag)
+        {
+            bottom_field_flag = READ_FLAG(bitstream, "bottom_field_flag");
+        }
+    }
+
+    if (IdrPicFlag)
+    {
+        idr_pic_id = READ_UVLC(bitstream, "idr_pic_id");
+    }
+
+    if (sps.pic_order_cnt_type == 0)
+    {
+        pic_order_cnt_lsb = READ_CODE(bitstream, (sps.log2_max_pic_order_cnt_lsb_minus4 + 4), "pic_order_cnt_lsb");
+        if (pps.bottom_field_pic_order_in_frame_present_flag && !field_pic_flag)
+        {
+            delta_pic_order_cnt_bottom = READ_SVLC(bitstream, "delta_pic_order_cnt_bottom");
+        }
+    }
+
+    if (sps.pic_order_cnt_type == 1 && !sps.delta_pic_order_always_zero_flag)
+    {
+        delta_pic_order_cnt[0] = READ_SVLC(bitstream, "delta_pic_order_cnt[0]");
+
+        if (pps.bottom_field_pic_order_in_frame_present_flag && !field_pic_flag)
+        {
+            delta_pic_order_cnt[1] = READ_SVLC(bitstream, "delta_pic_order_cnt[1]");
+        }
+    }
+
+    if (pps.redundant_pic_cnt_present_flag)
+    {
+        redundant_pic_cnt = READ_UVLC(bitstream, "redundant_pic_cnt");
+    }
+
+    if (slice_type == B_SLICE)
+    {
+        direct_spatial_mv_pred_flag = READ_FLAG(bitstream, "direct_spatial_mv_pred_flag");
+    }
+    if (slice_type == P_SLICE || slice_type == SP_SLICE || slice_type == B_SLICE)
+    {
+        num_ref_idx_active_override_flag = READ_FLAG(bitstream, "num_ref_idx_active_override_flag");
+        if (num_ref_idx_active_override_flag)
+        {
+            num_ref_idx_l0_active_minus1 = READ_UVLC(bitstream, "num_ref_idx_l0_active_minus1");
+            if (slice_type == B_SLICE)
+            {
+                num_ref_idx_l1_active_minus1 = READ_UVLC(bitstream, "num_ref_idx_l1_active_minus1");
+            }
+        }
+    }
+
+    ref_pic_list_modification(bitstream, slice);
+
+    if ( (pps.weighted_pred_flag && (slice_type == P_SLICE || slice_type == SP_SLICE))
+      || (pps.weighted_bipred_idc == 1 && slice_type == B_SLICE) )
+    {
+        pred_weight_table(bitstream, slice, sps);
+    }
+
+    printf("nal_ref_idc=%d\n", nal_ref_idc);
+
+    if (nal_ref_idc != 0)
+    {
+        dec_ref_pic_marking(bitstream, slice, IdrPicFlag);
+    }
+
+    if (pps.entropy_coding_mode_flag && slice_type != I_SLICE && slice_type != SI_SLICE)
+    {
+        cabac_init_idc = READ_UVLC(bitstream, "cabac_init_idc");
+    }
+
+    slice_qp_delta = READ_SVLC(bitstream, "slice_qp_delta");
+
+    if (slice_type == SP_SLICE || slice_type == SI_SLICE)
+    {
+        if (slice_type == SP_SLICE)
+        {
+            sp_for_switch_flag = READ_FLAG(bitstream, "sp_for_switch_flag");
+        }
+
+        slice_qs_delta = READ_SVLC(bitstream, "slice_qs_delta");
+    }
+
+    if (pps.deblocking_filter_control_present_flag)
+    {
+        disable_deblocking_filter_idc = READ_UVLC(bitstream, "disable_deblocking_filter_idc");
+        if (disable_deblocking_filter_idc != 1)
+        {
+            slice_alpha_c0_offset_div2 = READ_SVLC(bitstream, "slice_alpha_c0_offset_div2");
+            slice_beta_offset_div2 = READ_SVLC(bitstream, "slice_beta_offset_div2");
+        }
+    }
+
+    if (pps.num_slice_groups_minus1 > 0 && pps.slice_group_map_type >=3 && pps.slice_group_map_type <= 5)
+    {
+        int len = (sps.pic_height_in_map_units_minus1 + 1 ) * (sps.pic_width_in_mbs_minus1 + 1) / (pps.slice_group_change_rate_minus1 + 1);
+
+        if (((sps.pic_height_in_map_units_minus1 + 1) * (sps.pic_width_in_mbs_minus1 + 1)) % (pps.slice_group_change_rate_minus1 + 1))
+        {
+            len += 1;
+        }
+
+        len = CeilLog2(len + 1);
+
+        slice_group_change_cycle = READ_CODE(bitstream, len, "slice_group_change_cycle");
+    }
+
+    slice.first_mb_in_slice     = first_mb_in_slice;
+    slice.slice_type            = slice_type;
+    slice.pic_parameter_set_id  = pic_parameter_set_id;
+    slice.colour_plane_id       = colour_plane_id;
+    slice.frame_num             = frame_num;
+    slice.field_pic_flag        = field_pic_flag;
+    slice.bottom_field_flag     = bottom_field_flag;
+    slice.idr_pic_id            = idr_pic_id;
+    slice.pic_order_cnt_lsb     = pic_order_cnt_lsb;
+    slice.delta_pic_order_cnt_bottom = delta_pic_order_cnt_bottom;
+    slice.delta_pic_order_cnt[0] = delta_pic_order_cnt[0];
+
+    slice.redundant_pic_cnt = redundant_pic_cnt;
+
+    slice.direct_spatial_mv_pred_flag = direct_spatial_mv_pred_flag;
+
+    slice.num_ref_idx_active_override_flag  = num_ref_idx_active_override_flag;
+    slice.num_ref_idx_l0_active_minus1      = num_ref_idx_l0_active_minus1;
+    slice.num_ref_idx_l1_active_minus1      = num_ref_idx_l1_active_minus1;
+
+    slice.cabac_init_idc        = cabac_init_idc;
+    slice.slice_qp_delta        = slice_qp_delta;
+    slice.sp_for_switch_flag    = sp_for_switch_flag;
+    slice.slice_qs_delta        = slice_qs_delta;
+
+    slice.disable_deblocking_filter_idc = disable_deblocking_filter_idc;
+    slice.slice_alpha_c0_offset_div2    = slice_alpha_c0_offset_div2;
+    slice.slice_beta_offset_div2        = slice_beta_offset_div2;
+    slice.slice_group_change_cycle      = slice_group_change_cycle;
+
+    return ret;
+}
+
+
+// 7.3.4 Slice data syntax
+static void ParseSliceData(InputBitstream_t &ibs, PPS_t &pps)
+{
+    printf("left bits=%d\n", ibs.m_num_held_bits);
+
+    if (pps.entropy_coding_mode_flag)
+    {
+        while (ibs.m_num_held_bits > 0)
+        {
+            READ_CODE(ibs, 1, "cabac_alignment_one_bit");
         }
     }
 }
@@ -795,10 +1029,9 @@ void ParsePPS(InputBitstream_t &bitstream, PPS_t PPSs[], SPS_t SPSs[])
 }
 
 
-// 7.3.3 Slice header syntax
-int ParseSliceHeader
+int ParseSlice
 (
-    InputBitstream_t &bitstream,
+    InputBitstream_t &ibs,
     Slice_t &slice,
     SPS_t SPSs[],
     PPS_t PPSs[],
@@ -807,198 +1040,13 @@ int ParseSliceHeader
     string &message
 )
 {
-    uint32_t first_mb_in_slice  = 0;
-    uint32_t tmp                = 0;
-    SliceType slice_type        = P_SLICE;
-
-    uint32_t pic_parameter_set_id   = 0;
-    uint8_t colour_plane_id         = 0;
-    uint16_t frame_num              = 0;
-    bool field_pic_flag             = false;
-    bool bottom_field_flag          = false;
-    uint32_t idr_pic_id             = 0;
-    uint32_t pic_order_cnt_lsb      = 0;
-    int32_t delta_pic_order_cnt_bottom = 0;
-    int32_t delta_pic_order_cnt[2] = {0};
-    uint32_t redundant_pic_cnt = 0;
-    bool direct_spatial_mv_pred_flag = false;
-    bool num_ref_idx_active_override_flag = false;
-    uint32_t num_ref_idx_l0_active_minus1 = 0;
-    uint32_t num_ref_idx_l1_active_minus1 = 0;
-    uint32_t cabac_init_idc = 0;
-    int32_t slice_qp_delta = 0;
-    bool sp_for_switch_flag = false;
-    int32_t slice_qs_delta = 0;
-    uint32_t disable_deblocking_filter_idc = 0;
-    int32_t slice_alpha_c0_offset_div2 = 0;
-    int32_t slice_beta_offset_div2 = 0;
-    uint32_t slice_group_change_cycle = 0;
-
     int ret = 0;
 
-    first_mb_in_slice       = READ_UVLC(bitstream, "first_mb_in_slice");
-    tmp                     = READ_UVLC(bitstream, "slice_type");
-    pic_parameter_set_id    = READ_UVLC(bitstream, "pic_parameter_set_id");
+    ret = ParseSliceHeader(ibs, slice, SPSs, PPSs, IdrPicFlag, nal_ref_idc, message);
 
-    slice_type = (SliceType) (tmp % 5);
-    slice.slice_type = slice_type;
-
-    if (!PPSs[pic_parameter_set_id].isValid)
-    {
-        printf("PPS %d is not activated!\n", pic_parameter_set_id);
-        return -1;
-    }
-
-    PPS_t &pps = PPSs[ pic_parameter_set_id ];
-    SPS_t &sps = SPSs[ pps.seq_parameter_set_id ];
-
-    if (sps.separate_colour_plane_flag)
-    {
-        colour_plane_id = READ_CODE(bitstream, 2, "colour_plane_id");
-    }
-
-    frame_num = READ_CODE(bitstream, (sps.log2_max_frame_num_minus4 + 4), "frame_num");
-
-    if (!sps.frame_mbs_only_flag)
-    {
-        field_pic_flag = READ_FLAG(bitstream, "field_pic_flag");
-
-        if (field_pic_flag)
-        {
-            bottom_field_flag = READ_FLAG(bitstream, "bottom_field_flag");
-        }
-    }
-
-    if (IdrPicFlag)
-    {
-        idr_pic_id = READ_UVLC(bitstream, "idr_pic_id");
-    }
-
-    if (sps.pic_order_cnt_type == 0)
-    {
-        pic_order_cnt_lsb = READ_CODE(bitstream, (sps.log2_max_pic_order_cnt_lsb_minus4 + 4), "pic_order_cnt_lsb");
-        if (pps.bottom_field_pic_order_in_frame_present_flag && !field_pic_flag)
-        {
-            delta_pic_order_cnt_bottom = READ_SVLC(bitstream, "delta_pic_order_cnt_bottom");
-        }
-    }
-
-    if (sps.pic_order_cnt_type == 1 && !sps.delta_pic_order_always_zero_flag)
-    {
-        delta_pic_order_cnt[0] = READ_SVLC(bitstream, "delta_pic_order_cnt[0]");
-
-        if (pps.bottom_field_pic_order_in_frame_present_flag && !field_pic_flag)
-        {
-            delta_pic_order_cnt[1] = READ_SVLC(bitstream, "delta_pic_order_cnt[1]");
-        }
-    }
-
-    if (pps.redundant_pic_cnt_present_flag)
-    {
-        redundant_pic_cnt = READ_UVLC(bitstream, "redundant_pic_cnt");
-    }
-
-    if (slice_type == B_SLICE)
-    {
-        direct_spatial_mv_pred_flag = READ_FLAG(bitstream, "direct_spatial_mv_pred_flag");
-    }
-    if (slice_type == P_SLICE || slice_type == SP_SLICE || slice_type == B_SLICE)
-    {
-        num_ref_idx_active_override_flag = READ_FLAG(bitstream, "num_ref_idx_active_override_flag");
-        if (num_ref_idx_active_override_flag)
-        {
-            num_ref_idx_l0_active_minus1 = READ_UVLC(bitstream, "num_ref_idx_l0_active_minus1");
-            if (slice_type == B_SLICE)
-            {
-                num_ref_idx_l1_active_minus1 = READ_UVLC(bitstream, "num_ref_idx_l1_active_minus1");
-            }
-        }
-    }
-
-    ref_pic_list_modification(bitstream, slice);
-
-    if ( (pps.weighted_pred_flag && (slice_type == P_SLICE || slice_type == SP_SLICE))
-      || (pps.weighted_bipred_idc == 1 && slice_type == B_SLICE) )
-    {
-        pred_weight_table(bitstream, slice, sps);
-    }
-
-    if (nal_ref_idc != 0)
-    {
-        dec_ref_pic_marking(bitstream, slice, IdrPicFlag);
-    }
-
-    if (pps.entropy_coding_mode_flag && slice_type != I_SLICE && slice_type != SI_SLICE)
-    {
-        cabac_init_idc = READ_UVLC(bitstream, "cabac_init_idc");
-    }
-
-    slice_qp_delta = READ_SVLC(bitstream, "slice_qp_delta");
-
-    if (slice_type == SP_SLICE || slice_type == SI_SLICE)
-    {
-        if (slice_type == SP_SLICE)
-        {
-            sp_for_switch_flag = READ_FLAG(bitstream, "sp_for_switch_flag");
-        }
-
-        slice_qs_delta = READ_SVLC(bitstream, "slice_qs_delta");
-    }
-
-    if (pps.deblocking_filter_control_present_flag)
-    {
-        disable_deblocking_filter_idc = READ_UVLC(bitstream, "disable_deblocking_filter_idc");
-        if (disable_deblocking_filter_idc != 1)
-        {
-            slice_alpha_c0_offset_div2 = READ_SVLC(bitstream, "slice_alpha_c0_offset_div2");
-            slice_beta_offset_div2 = READ_SVLC(bitstream, "slice_beta_offset_div2");
-        }
-    }
-
-    if (pps.num_slice_groups_minus1 > 0 && pps.slice_group_map_type >=3 && pps.slice_group_map_type <= 5)
-    {
-        int len = (sps.pic_height_in_map_units_minus1 + 1 ) * (sps.pic_width_in_mbs_minus1 + 1) / (pps.slice_group_change_rate_minus1 + 1);
-
-        if (((sps.pic_height_in_map_units_minus1 + 1) * (sps.pic_width_in_mbs_minus1 + 1)) % (pps.slice_group_change_rate_minus1 + 1))
-        {
-            len += 1;
-        }
-
-        len = CeilLog2(len + 1);
-
-        slice_group_change_cycle = READ_CODE(bitstream, len, "slice_group_change_cycle");
-    }
-
-    slice.first_mb_in_slice     = first_mb_in_slice;
-    slice.slice_type            = slice_type;
-    slice.pic_parameter_set_id  = pic_parameter_set_id;
-    slice.colour_plane_id       = colour_plane_id;
-    slice.frame_num             = frame_num;
-    slice.field_pic_flag        = field_pic_flag;
-    slice.bottom_field_flag     = bottom_field_flag;
-    slice.idr_pic_id            = idr_pic_id;
-    slice.pic_order_cnt_lsb     = pic_order_cnt_lsb;
-    slice.delta_pic_order_cnt_bottom = delta_pic_order_cnt_bottom;
-    slice.delta_pic_order_cnt[0] = delta_pic_order_cnt[0];
-
-    slice.redundant_pic_cnt = redundant_pic_cnt;
-
-    slice.direct_spatial_mv_pred_flag = direct_spatial_mv_pred_flag;
-
-    slice.num_ref_idx_active_override_flag  = num_ref_idx_active_override_flag;
-    slice.num_ref_idx_l0_active_minus1      = num_ref_idx_l0_active_minus1;
-    slice.num_ref_idx_l1_active_minus1      = num_ref_idx_l1_active_minus1;
-
-    slice.cabac_init_idc        = cabac_init_idc;
-    slice.slice_qp_delta        = slice_qp_delta;
-    slice.sp_for_switch_flag    = sp_for_switch_flag;
-    slice.slice_qs_delta        = slice_qs_delta;
-
-    slice.disable_deblocking_filter_idc = disable_deblocking_filter_idc;
-    slice.slice_alpha_c0_offset_div2    = slice_alpha_c0_offset_div2;
-    slice.slice_beta_offset_div2        = slice_beta_offset_div2;
-    slice.slice_group_change_cycle      = slice_group_change_cycle;
+    ParseSliceData(ibs, PPSs[slice.pic_parameter_set_id]);
 
     return ret;
 }
+
 
