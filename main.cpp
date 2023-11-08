@@ -487,11 +487,8 @@ int main(int argc, char *argv[])
                                 ParseSlice(ibs1, testSlice, SPSs, PPSs, IdrPicFlag, nal_ref_idc, message);
                                 cnt++;
 
-                                if (cnt > 4) { exit(0); }
+                                if (cnt > 10) { exit(0); }
                             }
-
-                            
-                            //exit(0);
                         }
                         
                         break;

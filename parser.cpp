@@ -296,6 +296,7 @@ static void ref_pic_list_modification(InputBitstream_t &ibs, Slice_t &slice)
         ref_pic_list_modification_flag_l0 = READ_FLAG(ibs, "ref_pic_list_modification_flag_l0");
         if (ref_pic_list_modification_flag_l0)
         {
+            slice.ref_pic_list_modification_q0.clear();
             do
             {
                 modification_of_pic_nums_idc = READ_UVLC(ibs, "modification_of_pic_nums_idc");
@@ -322,6 +323,7 @@ static void ref_pic_list_modification(InputBitstream_t &ibs, Slice_t &slice)
         ref_pic_list_modification_flag_l1 = READ_FLAG(ibs, "ref_pic_list_modification_flag_l1");
         if (ref_pic_list_modification_flag_l1)
         {
+            slice.ref_pic_list_modification_q1.clear();
             do
             {
                 modification_of_pic_nums_idc = READ_UVLC(ibs, "modification_of_pic_nums_idc");
