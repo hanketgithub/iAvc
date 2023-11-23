@@ -327,6 +327,10 @@ static void write_dec_ref_pic_marking(OutputBitstream_t &obs, Slice_t &slice, bo
                     uint32_t max_long_term_frame_idx_plus1 = op[1];
                     WRITE_UVLC(obs, max_long_term_frame_idx_plus1, "max_long_term_frame_idx_plus1");
                 }
+                if (memory_management_control_operation == 0)
+                {
+                    WRITE_UVLC(obs, memory_management_control_operation, "memory_management_control_operation");
+                }
             }
         }
     }

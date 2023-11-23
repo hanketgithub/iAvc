@@ -421,6 +421,8 @@ static void dec_ref_pic_marking(InputBitstream_t &bitstream, Slice_t &slice, boo
 
         if (slice.adaptive_ref_pic_marking_mode_flag)
         {
+            slice.memory_management_control_ops.clear();
+
             uint32_t memory_management_control_operation;
             uint32_t difference_of_pic_nums_minus1;
             uint32_t long_term_pic_num;
@@ -449,6 +451,10 @@ static void dec_ref_pic_marking(InputBitstream_t &bitstream, Slice_t &slice, boo
                 {
                     max_long_term_frame_idx_plus1 = READ_UVLC(bitstream, "max_long_term_frame_idx_plus1");
                     slice.memory_management_control_ops.push_back( { memory_management_control_operation, max_long_term_frame_idx_plus1 } );
+                }
+                if (memory_management_control_operation == 0)
+                {
+                    slice.memory_management_control_ops.push_back( { memory_management_control_operation, 0 } );
                 }
             } while (memory_management_control_operation != 0);
         }
@@ -680,7 +686,7 @@ static void ParseSliceData(InputBitstream_t &ibs, PPS_t &pps)
 
 
 // 7.3.2.1.1 Sequence parameter set data syntax
-void ParseSPS(InputBitstream_t &bitstream, SPS_t SPSs[], AvcInfo_t &pAvcInfo)
+void ParseSPS(InputBitstream_t &ibs, SPS_t SPSs[], AvcInfo_t &pAvcInfo)
 {
     uint8_t profile_idc;
 
@@ -731,19 +737,19 @@ void ParseSPS(InputBitstream_t &bitstream, SPS_t SPSs[], AvcInfo_t &pAvcInfo)
 
     bool vui_parameters_present_flag;
 
-    profile_idc = READ_CODE(bitstream, 8, "profile_idc");
+    profile_idc = READ_CODE(ibs, 8, "profile_idc");
 
-    constrained_set0_flag = READ_FLAG(bitstream, "constrained_set0_flag");
-    constrained_set1_flag = READ_FLAG(bitstream, "constrained_set1_flag");
-    constrained_set2_flag = READ_FLAG(bitstream, "constrained_set2_flag");
-    constrained_set3_flag = READ_FLAG(bitstream, "constrained_set3_flag");
-    constrained_set4_flag = READ_FLAG(bitstream, "constrained_set4_flag");
-    constrained_set5_flag = READ_FLAG(bitstream, "constrained_set5_flag");
+    constrained_set0_flag = READ_FLAG(ibs, "constrained_set0_flag");
+    constrained_set1_flag = READ_FLAG(ibs, "constrained_set1_flag");
+    constrained_set2_flag = READ_FLAG(ibs, "constrained_set2_flag");
+    constrained_set3_flag = READ_FLAG(ibs, "constrained_set3_flag");
+    constrained_set4_flag = READ_FLAG(ibs, "constrained_set4_flag");
+    constrained_set5_flag = READ_FLAG(ibs, "constrained_set5_flag");
 
-    READ_CODE(bitstream, 2, "reserved_zero_2bits");
+    READ_CODE(ibs, 2, "reserved_zero_2bits");
 
-    level_idc = READ_CODE(bitstream, 8, "level_idc");
-    seq_parameter_set_id = READ_UVLC(bitstream, "seq_parameter_set_id");
+    level_idc = READ_CODE(ibs, 8, "level_idc");
+    seq_parameter_set_id = READ_UVLC(ibs, "seq_parameter_set_id");
 
     // Set SPS ID valid
     SPS_t &sps = SPSs[seq_parameter_set_id];
@@ -754,26 +760,26 @@ void ParseSPS(InputBitstream_t &bitstream, SPS_t SPSs[], AvcInfo_t &pAvcInfo)
      || profile_idc == 128 || profile_idc == 138 || profile_idc == 139 || profile_idc == 134 
      || profile_idc == 135)
     {
-        chroma_format_idc = READ_UVLC(bitstream, "chroma_format_idc");
+        chroma_format_idc = READ_UVLC(ibs, "chroma_format_idc");
         if (chroma_format_idc == 3)
         {
-            separate_colour_plane_flag = READ_FLAG(bitstream, "separate_colour_plane_flag");
+            separate_colour_plane_flag = READ_FLAG(ibs, "separate_colour_plane_flag");
         }
 
-        bit_depth_luma_minus8 = READ_UVLC(bitstream, "bit_depth_luma_minus8");
-        bit_depth_chroma_minus8 = READ_UVLC(bitstream, "bit_depth_chroma_minus8");
-        qpprime_y_zero_transform_bypass_flag = READ_FLAG(bitstream, "qpprime_y_zero_transform_bypass_flag");
-        seq_scaling_matrix_present_flag = READ_FLAG(bitstream, "seq_scaling_matrix_present_flag");
+        bit_depth_luma_minus8 = READ_UVLC(ibs, "bit_depth_luma_minus8");
+        bit_depth_chroma_minus8 = READ_UVLC(ibs, "bit_depth_chroma_minus8");
+        qpprime_y_zero_transform_bypass_flag = READ_FLAG(ibs, "qpprime_y_zero_transform_bypass_flag");
+        seq_scaling_matrix_present_flag = READ_FLAG(ibs, "seq_scaling_matrix_present_flag");
         if (seq_scaling_matrix_present_flag)
         {
             for (int i = 0; i < ( ( chroma_format_idc != 3 ) ? 8 : 12 ); i++)
             {
-                sps.seq_scaling_list_present_flag[i] = READ_FLAG(bitstream, "seq_scaling_list_present_flag");
+                sps.seq_scaling_list_present_flag[i] = READ_FLAG(ibs, "seq_scaling_list_present_flag");
                 if (sps.seq_scaling_list_present_flag[i])
                 {
                     if (i < 6)
                     {
-                        scaling_list(bitstream, ScalingList4x4[ i ], 16, sps.UseDefaultScalingMatrix4x4Flag[ i ] );
+                        scaling_list(ibs, ScalingList4x4[ i ], 16, sps.UseDefaultScalingMatrix4x4Flag[ i ] );
                         for (int j = 0; i < ScalingList4x4[ i ].size(); j++)
                         {
                             sps.ScalingList4x4[i][j] = ScalingList4x4[ i ][ j ];
@@ -781,7 +787,7 @@ void ParseSPS(InputBitstream_t &bitstream, SPS_t SPSs[], AvcInfo_t &pAvcInfo)
                     }
                     else
                     {
-                        scaling_list(bitstream, ScalingList8x8[ i - 6 ], 64, sps.UseDefaultScalingMatrix8x8Flag[ i - 6 ] );
+                        scaling_list(ibs, ScalingList8x8[ i - 6 ], 64, sps.UseDefaultScalingMatrix8x8Flag[ i - 6 ] );
                         for (int j = 0; j < ScalingList8x8[ i - 6 ].size(); j++)
                         {
                             sps.ScalingList8x8[i-6][j] = ScalingList8x8[ i - 6 ][ j ];
@@ -792,52 +798,52 @@ void ParseSPS(InputBitstream_t &bitstream, SPS_t SPSs[], AvcInfo_t &pAvcInfo)
         }
     }
 
-    log2_max_frame_num_minus4 = READ_UVLC(bitstream, "log2_max_frame_num_minus4");
-    pic_order_cnt_type = READ_UVLC(bitstream, "pic_order_cnt_type");
+    log2_max_frame_num_minus4 = READ_UVLC(ibs, "log2_max_frame_num_minus4");
+    pic_order_cnt_type = READ_UVLC(ibs, "pic_order_cnt_type");
     if (pic_order_cnt_type == 0)
     {
-        log2_max_pic_order_cnt_lsb_minus4 = READ_UVLC(bitstream, "log2_max_pic_order_cnt_lsb_minus4");
+        log2_max_pic_order_cnt_lsb_minus4 = READ_UVLC(ibs, "log2_max_pic_order_cnt_lsb_minus4");
     }
     else if (pic_order_cnt_type == 1)
     {
-        delta_pic_order_always_zero_flag    = READ_FLAG(bitstream, "delta_pic_order_always_zero_flag");
-        offset_for_non_ref_pic              = READ_SVLC(bitstream, "offset_for_non_ref_pic");
-        offset_for_top_to_bottom_field      = READ_SVLC(bitstream, "offset_for_top_to_bottom_field");
-        num_ref_frames_in_pic_order_cnt_cycle = READ_UVLC(bitstream, "num_ref_frames_in_pic_order_cnt_cycle");
+        delta_pic_order_always_zero_flag    = READ_FLAG(ibs, "delta_pic_order_always_zero_flag");
+        offset_for_non_ref_pic              = READ_SVLC(ibs, "offset_for_non_ref_pic");
+        offset_for_top_to_bottom_field      = READ_SVLC(ibs, "offset_for_top_to_bottom_field");
+        num_ref_frames_in_pic_order_cnt_cycle = READ_UVLC(ibs, "num_ref_frames_in_pic_order_cnt_cycle");
         for (uint32_t i = 0; i < sps.num_ref_frames_in_pic_order_cnt_cycle; i++)
         {
-            sps.offset_for_ref_frame[ i ] = READ_SVLC(bitstream, "offset_for_ref_frame");
+            sps.offset_for_ref_frame[ i ] = READ_SVLC(ibs, "offset_for_ref_frame");
         }
     }
 
-    max_num_ref_frames = READ_UVLC(bitstream, "max_num_ref_frames");
-    gaps_in_frame_num_value_allowed_flag = READ_FLAG(bitstream, "gaps_in_frame_num_value_allowed_flag");
-    pic_width_in_mbs_minus1 = READ_UVLC(bitstream, "pic_width_in_mbs_minus1");
-    pic_height_in_map_units_minus1 = READ_UVLC(bitstream, "pic_height_in_map_units_minus1");
-    frame_mbs_only_flag = READ_FLAG(bitstream, "frame_mbs_only_flag");
+    max_num_ref_frames = READ_UVLC(ibs, "max_num_ref_frames");
+    gaps_in_frame_num_value_allowed_flag = READ_FLAG(ibs, "gaps_in_frame_num_value_allowed_flag");
+    pic_width_in_mbs_minus1 = READ_UVLC(ibs, "pic_width_in_mbs_minus1");
+    pic_height_in_map_units_minus1 = READ_UVLC(ibs, "pic_height_in_map_units_minus1");
+    frame_mbs_only_flag = READ_FLAG(ibs, "frame_mbs_only_flag");
     if (!frame_mbs_only_flag)
     {
-        mb_adaptive_frame_field_flag = READ_FLAG(bitstream, "mb_adaptive_frame_field_flag");
+        mb_adaptive_frame_field_flag = READ_FLAG(ibs, "mb_adaptive_frame_field_flag");
     }
 
-    direct_8x8_inference_flag = READ_FLAG(bitstream, "direct_8x8_inference_flag");
+    direct_8x8_inference_flag = READ_FLAG(ibs, "direct_8x8_inference_flag");
 
-    frame_cropping_flag = READ_FLAG(bitstream, "frame_cropping_flag");
+    frame_cropping_flag = READ_FLAG(ibs, "frame_cropping_flag");
     if (frame_cropping_flag)
     {
-        frame_crop_left_offset      = READ_UVLC(bitstream, "frame_crop_left_offset");
-        frame_crop_right_offset     = READ_UVLC(bitstream, "frame_crop_right_offset");
-        frame_crop_top_offset       = READ_UVLC(bitstream, "frame_crop_top_offset");
-        frame_crop_bottom_offset    = READ_UVLC(bitstream, "frame_crop_bottom_offset");
+        frame_crop_left_offset      = READ_UVLC(ibs, "frame_crop_left_offset");
+        frame_crop_right_offset     = READ_UVLC(ibs, "frame_crop_right_offset");
+        frame_crop_top_offset       = READ_UVLC(ibs, "frame_crop_top_offset");
+        frame_crop_bottom_offset    = READ_UVLC(ibs, "frame_crop_bottom_offset");
     }
 
-    vui_parameters_present_flag = READ_FLAG(bitstream, "vui_parameters_present_flag");
+    vui_parameters_present_flag = READ_FLAG(ibs, "vui_parameters_present_flag");
     if (vui_parameters_present_flag)
     {
-        vui_parameters(bitstream, sps.vui_seq_parameters);
+        vui_parameters(ibs, sps.vui_seq_parameters);
     }
 
-    rbsp_trailing_bits(bitstream);
+    rbsp_trailing_bits(ibs);
 
 
     sps.profile_idc             = profile_idc;

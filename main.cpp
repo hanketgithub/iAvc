@@ -36,7 +36,8 @@ using namespace std;
 
 #define ZEROBYTES_SHORTSTARTCODE    2
 #define SIZE_OF_NAL_UNIT_HDR        1
-#define ES_BUFFER_SIZE              (3840 * 2160)
+#define NAL_HDR_MAX_SIZE            100
+#define ES_BUFFER_SIZE              NAL_HDR_MAX_SIZE
 
 
 static uint8_t u8endCode[] = { 0xFC, 0xFD, 0xFE, 0xFF };
@@ -112,7 +113,6 @@ static bool scan_nal
         offset = 4;
     }
 
-    //printf("prefix offset=%d\n", offset);
     *prefix_len = offset;
     p += offset;
 
@@ -192,6 +192,16 @@ static uint32_t EBSPtoRBSP
 }
 
 
+static bool isOk(InputBitstream_t &ibs, OutputBitstream_t &obs)
+{   
+    for (int i = 0; i < obs.m_fifo.size(); i++)
+    {
+        if (ibs.m_fifo[i] != obs.m_fifo[i]) { return false; }
+    }
+
+    return true;
+}
+
 /*!
 ************************************************************************
 *  \brief
@@ -213,32 +223,6 @@ static uint32_t EBSPtoRBSP
 *
 ************************************************************************
 */
-#if 0
-int RBSPtoEBSP(uint8_t *NaluBuffer, uint8_t *rbsp, int rbsp_size)
-{
-    int j           = 0;
-    int zero_cnt    = 0;
-
-    for (int i = 0; i < rbsp_size; i++)
-    {
-        if (zero_cnt == ZEROBYTES_SHORTSTARTCODE && !(rbsp[i] & 0xFC))
-        {
-            NaluBuffer[j] = 0x03;
-            j++;
-            zero_cnt = 0;
-        }
-
-        NaluBuffer[j] = rbsp[i];
-
-        if (rbsp[i] == 0x00) { zero_cnt++; }
-        else { zero_cnt = 0; }
-
-        j++;
-    }
-
-    return j;
-}
-#else
 int RBSPtoEBSP(vector<uint8_t> &ebsp, vector<uint8_t> &rbsp)
 {
     int zero_cnt    = 0;
@@ -258,7 +242,6 @@ int RBSPtoEBSP(vector<uint8_t> &ebsp, vector<uint8_t> &rbsp)
 
     return ebsp.size();
 }
-#endif
 
 
 int main(int argc, char *argv[])
@@ -311,28 +294,12 @@ int main(int argc, char *argv[])
         if (has_start_code(ptr, 2))
         {
             prefix_len = 3;
-
-            // 0x00 0x00 0x01 0x47 is TS header
-            if (ptr[prefix_len] == 0x47)
-            {
-                ptr += prefix_len;
-                continue;
-            }
-
             nal_unit_header[0] = ptr[prefix_len];
             nalFound = true;
         }
         else if (has_start_code(ptr, 3))
         {
             prefix_len = 4;
-
-            // 0x00 0x00 0x00 0x01 0x47 is TS header
-            if (ptr[prefix_len] == 0x47)
-            {
-                ptr += prefix_len;
-                continue;
-            }
-
             nal_unit_header[0] = ptr[prefix_len];
             nalFound = true;
         }
@@ -369,61 +336,76 @@ int main(int argc, char *argv[])
                 {
                     case NALU_TYPE_SPS:
                     {
-                        ParseSPS(ibs, SPSs, tAvcInfo);
+                        printf("Find SPS, parse!\n");
 
-                        // Simple test
+                        ParseSPS(ibs, SPSs, tAvcInfo);
                         {
                             OutputBitstream_t obs;
 
                             obs.m_num_held_bits = 0;
                             obs.m_held_bits     = 0;
 
-                            printf("obs size=%lu\n", obs.m_fifo.size());
-
-                            //if (SPSs[0].isValid) // assume sps id is 0
-                            if (0)
+                            if (SPSs[0].isValid) // assume sps id is 0
                             {
-                                SPSs[0].log2_max_frame_num_minus4--; // do customer request...
+                                SPSs[0].log2_max_frame_num_minus4 = 11; // do customer request, generate SPS log2_max_frame_num = 15
+
+                                printf("Generating SPS!\n");
                                 GenerateSPS(obs, SPSs[0]);
 
-                                printf("\n\n--");
-                                for (int i = 0; i < obs.m_fifo.size(); i++)
+                                if (obs.m_fifo.size() != ibs.m_fifo_idx)
                                 {
-                                    printf("0x%02x ", obs.m_fifo[i]);
+                                    printf("Generated SPS len is different! %ld:%d\n", obs.m_fifo.size(), ibs.m_fifo_idx);
+                                    exit(-1);
                                 }
-                                printf("--\n\n");
+                                
+                                SPSs[0].log2_max_frame_num_minus4 = 12; // adjust back because we use 12 to parse slice
 
-                                InputBitstream_t ibs0;
 
-                                ibs0.m_fifo_size    = sizeof(u8EsBuffer) - (prefix_len + SIZE_OF_NAL_UNIT_HDR);
-                                ibs0.m_fifo         = (uint8_t *) calloc(1, ibs0.m_fifo_size);
-                                ibs0.m_fifo_idx      = 0;
-                                ibs0.m_num_held_bits = 0;
-                                ibs0.m_held_bits     = 0;
-                                ibs0.m_numBitsRead   = 0;
+                                //printf("\n\n--");
+                                //for (int i = 0; i < obs.m_fifo.size(); i++)
+                                //{
+                                //    printf("0x%02x ", obs.m_fifo[i]);
+                                //}
+                                //printf("--\n\n");
 
-                                for (int i = 0; i < obs.m_fifo.size(); i++)
-                                {
-                                    ibs0.m_fifo[i] = obs.m_fifo[i];
-                                }
+                                //InputBitstream_t ibs0;
 
-                                SPS_t sps0;
-                                AvcInfo_t aaa;
-                                ParseSPS(ibs0, SPSs, aaa);
+                                //ibs0.m_fifo_size    = sizeof(u8EsBuffer) - (prefix_len + SIZE_OF_NAL_UNIT_HDR);
+                                //ibs0.m_fifo         = (uint8_t *) calloc(1, ibs0.m_fifo_size);
+                                //ibs0.m_fifo_idx      = 0;
+                                //ibs0.m_num_held_bits = 0;
+                                //ibs0.m_held_bits     = 0;
+                                //ibs0.m_numBitsRead   = 0;
+
+                                //for (int i = 0; i < obs.m_fifo.size(); i++)
+                                //{
+                                //    ibs0.m_fifo[i] = obs.m_fifo[i];
+                                //}
+
+                                //SPS_t sps0;
+                                //AvcInfo_t aaa;
+                                //ParseSPS(ibs0, SPSs, aaa);
 
                                 vector<uint8_t> ebsp;
                                 
                                 RBSPtoEBSP(ebsp, obs.m_fifo);
 
-                                printf("\n\n--EBSP: ");
+                                ebsp.insert(ebsp.begin(), ptr, ptr+prefix_len+1);
                                 for (int i = 0; i < ebsp.size(); i++)
                                 {
-                                    printf("0x%02x ", ebsp[i]);
+                                    ptr[i] = ebsp[i];
                                 }
-                                printf("--\n\n");
+
+                                //printf("\n\n--EBSP: ");
+                                //for (int i = 0; i < ebsp.size(); i++)
+                                //{
+                                //    printf("0x%02x ", ebsp[i]);
+                                //}
+                                //printf("--\n\n");
+
+                                //exit(0);
                             }
                         }
-                        //exit(0);
                         break;
                     }
                     case NALU_TYPE_PPS:
@@ -442,52 +424,60 @@ int main(int argc, char *argv[])
                     case NALU_TYPE_SLICE:
                     {
                         static int cnt = 0;
+                        static int error_cnt = 0;
                         
                         bool IdrPicFlag = ( ( nal_unit_type == 5 ) ? 1 : 0 );
+                        int ret = ParseSlice(ibs, slice, SPSs, PPSs, IdrPicFlag, nal_ref_idc, message);
 
-                        if (ParseSlice(ibs, slice, SPSs, PPSs, IdrPicFlag, nal_ref_idc, message) < 0)
+                        if (ret < 0)
                         {
                         }
                         else
                         {
+                            SPS_t x_sps = SPSs[ PPSs[slice.pic_parameter_set_id].seq_parameter_set_id ];
+                            x_sps.log2_max_frame_num_minus4 = 11;
+
+                            slice.frame_num %= (1 << 15);
+                        
                             OutputBitstream_t obs;
 
                             obs.m_num_held_bits = 0;
                             obs.m_held_bits     = 0;
 
-                            GenerateSlice(obs, slice, SPSs[ PPSs[slice.pic_parameter_set_id].seq_parameter_set_id ], PPSs[slice.pic_parameter_set_id], IdrPicFlag, nal_ref_idc);
+                            GenerateSlice(obs, slice, x_sps, PPSs[slice.pic_parameter_set_id], IdrPicFlag, nal_ref_idc);
 
-                            cout << "chk slice output" << endl;
-                            for (int i = 0; i < obs.m_fifo.size(); i++)
+                            if (obs.m_fifo.size() == ibs.m_fifo_idx)
                             {
-                                printf("0x%02x ", obs.m_fifo[i]);
+                                obs.m_fifo.insert(obs.m_fifo.begin(), ptr, ptr+prefix_len+1);
+                                for (int i = 0; i < obs.m_fifo.size(); i++)
+                                {
+                                    ptr[i] = obs.m_fifo[i];
+                                }
                             }
-                            printf("\n");
-
-                            if (1)
+                            else
                             {
-                                InputBitstream_t ibs1 = {0};
+                                printf("Generated slice len is different! %ld:%d\n", obs.m_fifo.size(), ibs.m_fifo_idx);
 
-                                ibs1.m_fifo_size    = obs.m_fifo.size();
-                                ibs1.m_fifo         = (uint8_t *) calloc(1, ibs1.m_fifo_size);
+                                //for (int i = 0; i < prefix_len+1+ibs.m_fifo_idx; i++)
+                                //{
+                                //    printf("0x%02x ", ptr[i]);
+                                //}
+                                //printf("\n");
 
+                                // Padding 0x00 to make slice len the same, so it becomes [0x00 + prefix + NAL header + slice header]
+                                obs.m_fifo.insert(obs.m_fifo.begin(), ptr, ptr+prefix_len+1);
+                                obs.m_fifo.insert(obs.m_fifo.begin(), {0x00});
                                 for (int i = 0; i < obs.m_fifo.size(); i++)
                                 {
-                                    ibs1.m_fifo[i] = obs.m_fifo[i];
+                                    ptr[i] = obs.m_fifo[i];
                                 }
-
-                                for (int i = 0; i < obs.m_fifo.size(); i++)
-                                {
-                                    printf("0x%02x ", ibs1.m_fifo[i]);
-                                }
-
-                                printf("Reparse slice!\n");
-
-                                Slice_t testSlice = {0};
-                                ParseSlice(ibs1, testSlice, SPSs, PPSs, IdrPicFlag, nal_ref_idc, message);
-                                cnt++;
-
-                                if (cnt > 10) { exit(0); }
+                                //for (int i = 0; i < obs.m_fifo.size(); i++)
+                                //{
+                                //    printf("0x%02x ", obs.m_fifo[i]);
+                                //}
+                                //printf("\n");
+                                
+                                //exit(-1);
                             }
                         }
                         
@@ -513,6 +503,20 @@ int main(int argc, char *argv[])
         {
             ptr++;
         }
+    }
+
+    // Flush output
+    {
+        char output[256];
+        char *cp = strrchr(argv[1], '.');
+
+        strncpy(output, argv[1], cp - argv[1]);
+        strcat(output, "_fix_frame_num");
+        strcat(output, cp);
+
+        int ofd = open(output, O_RDWR | O_CREAT, S_IRUSR);
+        write(ofd, data, file_size);
+        close(ofd);
     }
 
     return 0;
